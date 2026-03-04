@@ -1,0 +1,50 @@
+/* PokemonCard.css */
+
+/* Styles for individual Pokémon cards */
+.pokemon-card {
+  background-color: #fffdf5;
+  border-radius: 10px;
+  padding: 10px 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 300px;
+  justify-content: flex-start;
+  border: 1px solid #f0dfaa;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+.pokemon-card img {
+  max-width: 120px;
+  margin-bottom: 4px;
+  image-rendering: pixelated;
+}
+
+.pokemon-card h2 {
+  font-size: 13px;
+  margin: 6px 0;
+  text-transform: capitalize;
+}
+
+.pokemon-number {
+  margin: 4px 0;
+  font-size: 11px;
+  color: #444;
+}
+
+.pokemon-meta {
+  margin: 4px 0;
+  padding: 0 10px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #555;
+}
+
+.pokemon-card:hover {
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
