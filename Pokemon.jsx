@@ -15,7 +15,11 @@ const Pokemon = ({ favorites, toggleFavorite }) => {
   const pokemonName = query.get("name");
 
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchPokemon = async () => {
+      setLoading(true);
+
       if (!pokemonName) {
         setLoading(false);
         setPokemon(null);
@@ -26,17 +30,27 @@ const Pokemon = ({ favorites, toggleFavorite }) => {
       try {
         const data = await getPokemonDetailsByName(pokemonName);
         if (!data) throw new Error("Pokémon not found");
-        setPokemon(data);
-        setError(null);
+        if (!isCancelled) {
+          setPokemon(data);
+          setError(null);
+        }
       } catch (err) {
-        setPokemon(null);
-        setError(err.message);
+        if (!isCancelled) {
+          setPokemon(null);
+          setError(err.name === "AbortError" ? "Request timed out. Please retry." : err.message);
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchPokemon();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [pokemonName]);
 
   const typeAccentMap = {

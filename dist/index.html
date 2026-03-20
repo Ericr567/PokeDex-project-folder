@@ -4,10 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pokédex</title>
-    <script type="module" crossorigin src="/assets/index-BCEvCNN2.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CP1gLkPT.css">
+    <script type="module" crossorigin src="/assets/index-DsfqwyoA.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DPN6eo2U.css">
   </head>
   <body>
     <div id="root">loading</div>
+    <script>
+      setTimeout(() => {
+        const root = document.getElementById("root");
+        if (!root) return;
+        if (root.textContent && root.textContent.trim().toLowerCase() === "loading") {
+          root.innerHTML = "App failed to start. Run <code>npm run dev</code> and open the Vite URL shown in terminal.";
+          root.style.padding = "16px";
+          root.style.fontFamily = "sans-serif";
+          root.style.lineHeight = "1.5";
+        }
+      }, 4000);
+    </script>
   </body>
 </html>

@@ -2,15 +2,15 @@
 
 /* Enhance input field aesthetics */
 .search-input {
-  width: 80%;
-  max-width: 560px;
-  padding: 10px;
-  margin: 20px auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   display: block;
+  padding: 11px 12px;
   border: 2px solid #D13325;
-  border-radius: 5px;
+  border-radius: 8px;
   font-family: "Press Start 2P", sans-serif;
-  font-size: 12px;
+  font-size: 10px;
   background-color: #fffbe6; /* Light background for focus */
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;

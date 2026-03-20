@@ -7,6 +7,18 @@
   </head>
   <body>
     <div id="root">loading</div>
-    <script type="module" src="/index.js"></script>
+    <script>
+      setTimeout(() => {
+        const root = document.getElementById("root");
+        if (!root) return;
+        if (root.textContent && root.textContent.trim().toLowerCase() === "loading") {
+          root.innerHTML = "App failed to start. Run <code>npm run dev</code> and open the Vite URL shown in terminal.";
+          root.style.padding = "16px";
+          root.style.fontFamily = "sans-serif";
+          root.style.lineHeight = "1.5";
+        }
+      }, 4000);
+    </script>
+    <script type="module" src="./index.js"></script>
   </body>
 </html>

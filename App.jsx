@@ -5,10 +5,18 @@ import Home from "./Home.jsx";
 import Pokedex from "./PokeDex";
 import Search from "./Search";
 import Pokemon from "./Pokemon";
+import { trackUxEvent } from "./analytics";
 
 export default function App() {
   const audioContextRef = useRef(null);
-  const [isBooting, setIsBooting] = useState(false);
+  const toastTimerRef = useRef(null);
+  const [isBooting, setIsBooting] = useState(() => {
+    try {
+      return localStorage.getItem("pokedex-boot-seen") !== "true";
+    } catch {
+      return true;
+    }
+  });
   const [favorites, setFavorites] = useState(() => {
     try {
       const storedFavorites = localStorage.getItem("pokedex-favorites");
@@ -25,6 +33,34 @@ export default function App() {
       return false;
     }
   });
+  const [toast, setToast] = useState(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try {
+      return localStorage.getItem("pokedex-onboarding-dismissed") !== "true";
+    } catch {
+      return true;
+    }
+  });
+
+  const showToast = (message, tone = "info") => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+
+    setToast({ message, tone });
+    trackUxEvent("toast_shown", { tone, message });
+    toastTimerRef.current = setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 1800);
+  };
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("pokedex-favorites", JSON.stringify(favorites));
@@ -36,28 +72,100 @@ export default function App() {
   }, [isDarkMode]);
 
   useEffect(() => {
-    const hasSeenBoot = localStorage.getItem("pokedex-boot-seen") === "true";
-    if (hasSeenBoot) return;
+    if (!isBooting) return;
 
-    setIsBooting(true);
-    localStorage.setItem("pokedex-boot-seen", "true");
+    try {
+      localStorage.setItem("pokedex-boot-seen", "true");
+    } catch {
+      // Ignore storage errors (private browsing / restricted storage).
+    }
 
     const timer = setTimeout(() => {
       setIsBooting(false);
     }, 1800);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isBooting]);
 
   const toggleFavorite = (name) => {
     if (!name) return;
     setFavorites((currentFavorites) => {
       const exists = currentFavorites.includes(name);
       if (exists) {
+        showToast(`${name} removed from favorites`, "warn");
+        trackUxEvent("favorite_removed", { name });
         return currentFavorites.filter((favorite) => favorite !== name);
       }
+      showToast(`${name} added to favorites`, "success");
+      trackUxEvent("favorite_added", { name });
       return [...currentFavorites, name];
     });
+  };
+
+  useEffect(() => {
+    const navigateTo = (path) => {
+      if (window.location.pathname === path) return;
+      window.history.pushState({}, "", path);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    };
+
+    const onKeyDown = (event) => {
+      const tagName = event.target?.tagName?.toLowerCase();
+      const isTypingTarget = tagName === "input" || tagName === "textarea" || event.target?.isContentEditable;
+
+      if (isTypingTarget) return;
+
+      if (event.key === "?") {
+        event.preventDefault();
+        setIsHelpOpen(true);
+        trackUxEvent("shortcut_used", { key: "?" });
+        return;
+      }
+
+      if (event.key === "Escape" && isHelpOpen) {
+        setIsHelpOpen(false);
+        return;
+      }
+
+      if (event.key === "/") {
+        event.preventDefault();
+        navigateTo("/search");
+        window.dispatchEvent(new Event("pokedex-focus-search"));
+        showToast("Search focused", "info");
+        trackUxEvent("shortcut_used", { key: "/" });
+        return;
+      }
+
+      if (event.key.toLowerCase() === "h") {
+        navigateTo("/");
+        trackUxEvent("shortcut_used", { key: "h" });
+        return;
+      }
+
+      if (event.key.toLowerCase() === "p") {
+        navigateTo("/pokedex");
+        trackUxEvent("shortcut_used", { key: "p" });
+        return;
+      }
+
+      if (event.key.toLowerCase() === "s") {
+        navigateTo("/search");
+        trackUxEvent("shortcut_used", { key: "s" });
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isHelpOpen]);
+
+  const dismissOnboarding = () => {
+    setShowOnboarding(false);
+    try {
+      localStorage.setItem("pokedex-onboarding-dismissed", "true");
+    } catch {
+      // Ignore storage failures.
+    }
+    trackUxEvent("onboarding_dismissed");
   };
 
   const playDeviceClick = () => {
@@ -135,19 +243,31 @@ export default function App() {
               </nav>
 
               <div className="content">
+                {showOnboarding && (
+                  <div className="onboarding-hint" role="note" aria-live="polite">
+                    <div>
+                      <strong>Quick start:</strong> press <kbd>/</kbd> to focus search, <kbd>p</kbd> for Pokédex,
+                      and <kbd>?</kbd> to open shortcut help.
+                    </div>
+                    <button className="status-clear" type="button" onClick={dismissOnboarding}>Dismiss</button>
+                  </div>
+                )}
                 <Routes>
-                  <Route path="/" element={<Home favorites={favorites} toggleFavorite={toggleFavorite} />} />
+                  <Route
+                    path="/"
+                    element={<Home favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} />}
+                  />
                   <Route
                     path="/pokedex"
-                    element={<Pokedex favorites={favorites} toggleFavorite={toggleFavorite} />}
+                    element={<Pokedex favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} />}
                   />
                   <Route
                     path="/search"
-                    element={<Search favorites={favorites} toggleFavorite={toggleFavorite} />}
+                    element={<Search favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} />}
                   />
                   <Route
                     path="/pokemon"
-                    element={<Pokemon favorites={favorites} toggleFavorite={toggleFavorite} />}
+                    element={<Pokemon favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} />}
                   />
                 </Routes>
               </div>
@@ -191,6 +311,27 @@ export default function App() {
           </div>
         </div>
       </div>
+      {toast && (
+        <div className="toast-stack" aria-live="polite" aria-atomic="true">
+          <div className={`toast-item toast-${toast.tone}`} role="status">
+            {toast.message}
+          </div>
+        </div>
+      )}
+      {isHelpOpen && (
+        <div className="help-overlay" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+          <div className="help-modal">
+            <h2>Keyboard Shortcuts</h2>
+            <p><kbd>/</kbd> Focus Search</p>
+            <p><kbd>h</kbd> Go Home</p>
+            <p><kbd>p</kbd> Go Pokédex</p>
+            <p><kbd>s</kbd> Go Search</p>
+            <p><kbd>?</kbd> Open this help</p>
+            <p><kbd>Esc</kbd> Close help</p>
+            <button className="app-button" type="button" onClick={() => setIsHelpOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
     </Router>
   );
 }

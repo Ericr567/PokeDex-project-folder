@@ -3,39 +3,55 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import "./Search.css";
 import PokemonCard from "./PokemonCard";
-import Spinner from "./Spinner";
-import { preloadPokemonDetails } from "./pokemonDetails";
+import { fetchPokemonListWithCache, preloadPokemonDetails } from "./pokemonDetails";
+import { trackUxEvent } from "./analytics";
 
-const Search = ({ favorites, toggleFavorite }) => {
+const Search = ({ favorites, toggleFavorite, notify }) => {
+  const searchInputRef = React.useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [pokemons, setPokemons] = useState([]);
   const [filteredPokemons, setFilteredPokemons] = useState([]);
   const [input, setInput] = useState(() => searchParams.get("q") || "");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [detailsByName, setDetailsByName] = useState({});
   const [copied, setCopied] = useState(false);
 
-  const fetchPokemons = async () => {
-    try {
-      const response = await fetch("https://pokedex.mimo.dev/api/pokemon");
-      if (!response.ok) {
-        throw new Error("Failed to fetch Pokémon list");
-      }
-      const data = await response.json();
-      setPokemons(data);
-      setError(null);
-    } catch (err) {
-      setPokemons([]);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isCancelled = false;
+    const controller = new AbortController();
+
+    const fetchPokemons = async () => {
+      try {
+        const { data, source } = await fetchPokemonListWithCache({ signal: controller.signal });
+        if (!isCancelled) {
+          setPokemons(data);
+          setError(null);
+          if (source === "cache") {
+            notify?.("Using cached Pokémon data", "warn");
+            trackUxEvent("cache_fallback_used", { page: "search" });
+          }
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setPokemons([]);
+          setError(err.name === "AbortError" ? "Request timed out. Please retry." : err.message);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
     fetchPokemons();
-  }, []);
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+    };
+  }, [reloadToken]);
 
   // Sync input when URL changes via browser navigation (back/forward buttons).
   useEffect(() => {
@@ -56,6 +72,15 @@ const Search = ({ favorites, toggleFavorite }) => {
       setSearchParams(nextParams, { replace: true });
     }
   }, [input, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const onFocusSearch = () => {
+      searchInputRef.current?.focus();
+      trackUxEvent("shortcut_used", { action: "focus_search" });
+    };
+    window.addEventListener("pokedex-focus-search", onFocusSearch);
+    return () => window.removeEventListener("pokedex-focus-search", onFocusSearch);
+  }, []);
 
   useEffect(() => {
     if (input === "") {
@@ -80,20 +105,42 @@ const Search = ({ favorites, toggleFavorite }) => {
     try {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
+      notify?.("Search link copied", "success");
+      trackUxEvent("copy_link", { page: "search" });
       setTimeout(() => setCopied(false), 1600);
     } catch {
+      notify?.("Could not copy link", "warn");
       setCopied(false);
     }
+  };
+
+  const handleRetry = () => {
+    setLoading(true);
+    setError(null);
+    setReloadToken((current) => current + 1);
+    notify?.("Retrying search fetch", "info");
+    trackUxEvent("retry_clicked", { page: "search" });
+  };
+
+  const clearSearch = () => {
+    setInput("");
+    notify?.("Search cleared", "info");
+    trackUxEvent("search_cleared");
   };
 
   return (
     <div className="page-shell">
       <h1 className="section-title">Search a Pokémon</h1>
       <p className="section-subtitle">Start typing to filter Pokémon by name.</p>
-      {loading && <Spinner />}
-      {error && <p className="status-error">Error: {error}</p>}
+      {error && (
+        <div className="status-error" role="alert">
+          <p>Error: {error}</p>
+          <button className="app-button" type="button" onClick={handleRetry}>Retry</button>
+        </div>
+      )}
       <div className="search-actions">
         <input
+          ref={searchInputRef}
           className="search-input"
           placeholder="Enter Pokémon name..."
           value={input}
@@ -104,21 +151,61 @@ const Search = ({ favorites, toggleFavorite }) => {
         </button>
       </div>
 
-      {!loading && !error && input !== "" && filteredPokemons.length === 0 && (
-        <p className="status-empty">No Pokémon matches “{input}”.</p>
+      <div className="quick-actions" role="group" aria-label="Search quick actions">
+        <button className="status-clear" type="button" onClick={clearSearch}>Clear Search</button>
+        <button
+          className="status-clear"
+          type="button"
+          onClick={() => {
+            setInput("pi");
+            notify?.("Quick search for 'pi'", "info");
+          }}
+        >
+          Try "pi"
+        </button>
+      </div>
+
+      {!loading && !error && input === "" && (
+        <div className="empty-state" role="status">
+          <div className="empty-icon">[ ? ]</div>
+          <h3>Start with a name</h3>
+          <p>Type at least one letter to search the Pokédex instantly.</p>
+        </div>
       )}
 
-      <ul className="pokemon-grid">
-        {filteredPokemons.map((pokemon) => (
-          <PokemonCard
-            key={pokemon.name}
-            pokemon={pokemon}
-            details={detailsByName[pokemon.name]}
-            isFavorite={favorites.includes(pokemon.name)}
-            onToggleFavorite={toggleFavorite}
-          />
-        ))}
-      </ul>
+      {!loading && !error && input !== "" && filteredPokemons.length === 0 && (
+        <div className="empty-state">
+          <div className="empty-icon">[ x ]</div>
+          <h3>No match found</h3>
+          <p>No Pokémon matches “{input}”. Try fewer letters or clear search.</p>
+        </div>
+      )}
+
+      {loading ? (
+        <ul className="pokemon-grid" aria-hidden="true">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <li className="skeleton-card" key={`search-skeleton-${index}`}>
+              <div className="skeleton-chip" />
+              <div className="skeleton-image" />
+              <div className="skeleton-line skeleton-title" />
+              <div className="skeleton-line" />
+              <div className="skeleton-line skeleton-short" />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="pokemon-grid">
+          {filteredPokemons.map((pokemon) => (
+            <PokemonCard
+              key={pokemon.name}
+              pokemon={pokemon}
+              details={detailsByName[pokemon.name]}
+              isFavorite={favorites.includes(pokemon.name)}
+              onToggleFavorite={toggleFavorite}
+            />
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

@@ -4,7 +4,7 @@
 .pokemon-card {
   background-color: #fffdf5;
   border-radius: 10px;
-  padding: 10px 8px;
+  padding: 12px 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   margin: 0;
   display: flex;
@@ -13,6 +13,7 @@
   min-height: 300px;
   justify-content: flex-start;
   border: 1px solid #f0dfaa;
+  gap: 4px;
   transition:
     transform 0.3s ease,
     box-shadow 0.3s ease;
@@ -45,6 +46,6 @@
 }
 
 .pokemon-card:hover {
-  transform: translateY(-5px) scale(1.05);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  transform: translateY(-3px);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.17);
 }
