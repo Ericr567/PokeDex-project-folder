@@ -68,6 +68,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
   const [typeFilter, setTypeFilter] = useState(() => searchParams.get("type") || "");
   const [genFilter, setGenFilter] = useState(() => Number(searchParams.get("gen")) || 0);
   const [detailsByName, setDetailsByName] = useState({});
+  const [isTypeHydrating, setIsTypeHydrating] = useState(false);
   const [copied, setCopied] = useState(false);
   const pokemonsPerPage = 10;
 
@@ -134,22 +135,37 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
     [pokemons, normalizedSearchTerm, favoritesOnly, favorites, genFilter, genRange.min, genRange.max],
   );
 
+  const missingTypeDetailsCount = useMemo(
+    () => (typeFilter
+      ? baseFilteredPokemons.reduce((count, pokemon) => (detailsByName[pokemon.name] ? count : count + 1), 0)
+      : 0),
+    [typeFilter, baseFilteredPokemons, detailsByName],
+  );
+
+  const isTypeFilterLoading = Boolean(typeFilter) && (isTypeHydrating || missingTypeDetailsCount > 0);
+
   // Preload type-filter candidates in small batches to keep mobile responsive.
   useEffect(() => {
-    if (!typeFilter) return;
+    if (!typeFilter) {
+      setIsTypeHydrating(false);
+      return;
+    }
 
     const candidates = baseFilteredPokemons
       .map((pokemon) => pokemon.name)
       .filter((name) => !requestedTypeDetailsRef.current.has(name));
 
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) {
+      setIsTypeHydrating(false);
+      return;
+    }
 
     const isMobile = window.matchMedia?.("(max-width: 768px)")?.matches ?? false;
     const batchSize = isMobile ? 8 : 16;
-    const maxToQueue = isMobile ? 64 : 220;
-    const queue = candidates.slice(0, maxToQueue);
+    const queue = candidates;
 
     queue.forEach((name) => requestedTypeDetailsRef.current.add(name));
+    setIsTypeHydrating(true);
 
     let isCancelled = false;
 
@@ -163,14 +179,19 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
         // Yield between batches so touch/scroll stays responsive.
         await new Promise((resolve) => setTimeout(resolve, 0));
       }
+
+      if (!isCancelled) {
+        setIsTypeHydrating(false);
+      }
     };
 
     preloadInBatches();
 
     return () => {
       isCancelled = true;
+      setIsTypeHydrating(false);
     };
-  }, [typeFilter, baseFilteredPokemons]);
+  }, [typeFilter, baseFilteredPokemons, detailsByName]);
 
   const filteredPokemons = useMemo(
     () => baseFilteredPokemons.filter((pokemon) => {
@@ -276,6 +297,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
         <span>Favorites: {favorites.length}</span>
         <span>
           Filters: {activeFilterLabels.length > 0 ? activeFilterLabels.join(" • ") : "None"}
+          {isTypeFilterLoading ? " • Loading type entries..." : ""}
         </span>
         <button className="status-clear" type="button" onClick={clearFilters}>
           Clear Filters
@@ -288,7 +310,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
           <button className="app-button" type="button" onClick={handleRetry}>Retry</button>
         </div>
       )}
-      {!loading && !error && currentPokemons.length === 0 && (
+      {!loading && !isTypeFilterLoading && !error && currentPokemons.length === 0 && (
         <div className="empty-state">
           <div className="empty-icon">[ ! ]</div>
           <h3>No Pokémon in this view</h3>
@@ -371,7 +393,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
         <button className="status-clear" type="button" onClick={() => setSortMode("id-asc")}>Sort by Number</button>
       </div>
 
-      {loading ? (
+      {loading || isTypeFilterLoading ? (
         <ul className="pokemon-grid" aria-hidden="true">
           {Array.from({ length: pokemonsPerPage }).map((_, index) => (
             <li className="skeleton-card" key={`pokedex-skeleton-${index}`}>
@@ -406,21 +428,21 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
         min="1"
         max={rangeMax}
         value={currentPage}
-        disabled={loading || totalPages === 0}
+        disabled={loading || isTypeFilterLoading || totalPages === 0}
         onChange={(e) => setCurrentPage(Number(e.target.value))}
       />
 
       <div className="pager-controls">
         <button
           className="app-button"
-          disabled={currentPage <= 1}
+          disabled={isTypeFilterLoading || currentPage <= 1}
           onClick={() => setCurrentPage(currentPage - 1)}
         >
           Previous
         </button>
         <button
           className="app-button"
-          disabled={currentPage >= totalPages}
+          disabled={isTypeFilterLoading || currentPage >= totalPages}
           onClick={() => setCurrentPage(currentPage + 1)}
         >
           Next
