@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getPokemonDetailsByName } from "./pokemonDetails";
+import { fetchJsonWithTimeout, getPokemonDetailsByName } from "./pokemonDetails";
 import { getTypeMultiplier, TYPE_COLORS } from "./TypeEffectiveness";
 import { usePokemonList } from "./usePokemonList";
 
 const BATTLE_STATS_KEY = "pokedex-battle-stats";
+const MOVE_CACHE = new Map();
+const MOVE_PENDING = new Map();
 
 const getStat = (pokemon, statName, fallback) => {
   const found = pokemon?.stats?.find((stat) => stat.stat?.name === statName);
@@ -34,33 +36,87 @@ const getBattleStatsFromStorage = () => {
   }
 };
 
-const buildMoves = (types) => {
-  const primaryMoves = unique(types).slice(0, 2).map((type, index) => ({
-    id: `${type}-${index}`,
-    name: `${type} strike`,
-    type,
-    pp: 8,
-    maxPp: 8,
-  }));
-
-  return [
-    ...primaryMoves,
-    {
-      id: "normal-jab",
-      name: "normal jab",
-      type: "normal",
-      pp: 14,
-      maxPp: 14,
-    },
-  ];
+const normalizeMoveMeta = (moveEntry, fallbackType) => {
+  const name = moveEntry?.name || moveEntry?.move?.name || "tackle";
+  return {
+    id: name,
+    name,
+    type: fallbackType || "normal",
+    pp: 12,
+    maxPp: 12,
+    power: 55,
+    accuracy: 100,
+  };
 };
 
-const buildCombatant = (pokemon, side) => {
+const loadMoveMeta = async (moveEntry, fallbackType) => {
+  const moveUrl = moveEntry?.url || moveEntry?.move?.url;
+  const moveName = moveEntry?.name || moveEntry?.move?.name;
+  const cacheKey = moveUrl || moveName;
+
+  if (!cacheKey) return normalizeMoveMeta(moveEntry, fallbackType);
+  if (MOVE_CACHE.has(cacheKey)) return MOVE_CACHE.get(cacheKey);
+  if (MOVE_PENDING.has(cacheKey)) return MOVE_PENDING.get(cacheKey);
+
+  const request = (async () => {
+    try {
+      if (!moveUrl) {
+        const fallback = normalizeMoveMeta(moveEntry, fallbackType);
+        MOVE_CACHE.set(cacheKey, fallback);
+        return fallback;
+      }
+
+      const response = await fetchJsonWithTimeout(moveUrl, { timeoutMs: 8000 });
+      if (!response.ok) throw new Error("Move request failed");
+      const data = await response.json();
+
+      const normalized = {
+        id: moveName || data.name,
+        name: moveName || data.name,
+        type: data?.type?.name || fallbackType || "normal",
+        pp: Math.max(1, Number(data?.pp || 10)),
+        maxPp: Math.max(1, Number(data?.pp || 10)),
+        power: Math.max(25, Number(data?.power || 55)),
+        accuracy: Math.max(55, Number(data?.accuracy || 100)),
+      };
+
+      MOVE_CACHE.set(cacheKey, normalized);
+      return normalized;
+    } catch {
+      const fallback = normalizeMoveMeta(moveEntry, fallbackType);
+      MOVE_CACHE.set(cacheKey, fallback);
+      return fallback;
+    } finally {
+      MOVE_PENDING.delete(cacheKey);
+    }
+  })();
+
+  MOVE_PENDING.set(cacheKey, request);
+  return request;
+};
+
+const pickMovesForPokemon = (pokemon, fallbackType) => {
+  const entries = (pokemon?.moves || []).slice(0, 24);
+  if (entries.length === 0) {
+    return [
+      normalizeMoveMeta({ name: `${fallbackType || "normal"} strike` }, fallbackType),
+      normalizeMoveMeta({ name: "quick attack" }, "normal"),
+    ];
+  }
+
+  const shuffled = [...entries].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 4);
+};
+
+const buildCombatant = async (pokemon, side) => {
   const hpStat = getStat(pokemon, "hp", 60);
   const attackStat = getStat(pokemon, "attack", 55);
   const defenseStat = getStat(pokemon, "defense", 50);
   const speedStat = getStat(pokemon, "speed", 50);
   const types = pokemon?.types?.map((entry) => entry.type.name) || ["normal"];
+  const moveEntries = pickMovesForPokemon(pokemon, types[0]);
+  const loadedMoves = await Promise.all(moveEntries.map((entry) => loadMoveMeta(entry, types[0])));
+  const moves = loadedMoves.map((move, index) => ({ ...move, id: `${move.id}-${index}` }));
 
   return {
     pokemon,
@@ -75,18 +131,19 @@ const buildCombatant = (pokemon, side) => {
     status: null,
     fainted: false,
     side,
-    moves: buildMoves(types),
+    moves,
   };
 };
 
 const getSpeedForTurn = (combatant) => (combatant.status === "paralysis" ? Math.floor(combatant.speed * 0.55) : combatant.speed);
 
-const calcDamage = (attacker, defender, moveType) => {
-  const typeMultiplier = getTypeMultiplier(moveType, defender.types);
+const calcDamage = (attacker, defender, move) => {
+  const typeMultiplier = getTypeMultiplier(move.type, defender.types);
   const critMultiplier = Math.random() < 0.1 ? 1.5 : 1;
   const variance = 0.9 + Math.random() * 0.2;
   const burnModifier = attacker.status === "burn" ? 0.8 : 1;
-  const scaled = ((attacker.attack / Math.max(1, defender.defense)) * 18 + 8) * typeMultiplier * burnModifier;
+  const powerScale = Math.max(25, Number(move?.power || 55)) / 55;
+  const scaled = (((attacker.attack / Math.max(1, defender.defense)) * 18 + 8) * powerScale) * typeMultiplier * burnModifier;
   const damage = Math.max(1, Math.round(scaled * critMultiplier * variance));
 
   return {
@@ -211,8 +268,7 @@ const BattleMode = ({ team = [], notify, shinyDexMode = false }) => {
     try {
       const playerPool = [...teamNames];
       if (!playerPool.length) {
-        const randomPool = [...pokemons].sort(() => Math.random() - 0.5).slice(0, 6).map((entry) => entry.name);
-        playerPool.push(...randomPool);
+        throw new Error("Create a team first to enter battle mode");
       }
 
       const leadName = selectedPlayerName || playerPool[0];
@@ -222,15 +278,15 @@ const BattleMode = ({ team = [], notify, shinyDexMode = false }) => {
         .map((entry) => entry.name)
         .filter((name) => !orderedPlayer.includes(name))
         .sort(() => Math.random() - 0.5)
-        .slice(0, 6);
+        .slice(0, orderedPlayer.length);
 
       const [playerDetailsList, enemyDetailsList] = await Promise.all([
         Promise.all(orderedPlayer.map((name) => getPokemonDetailsByName(name))),
         Promise.all(enemyPool.map((name) => getPokemonDetailsByName(name))),
       ]);
 
-      const builtPlayer = playerDetailsList.filter(Boolean).map((pokemon) => buildCombatant(pokemon, "player"));
-      const builtEnemy = enemyDetailsList.filter(Boolean).map((pokemon) => buildCombatant(pokemon, "enemy"));
+      const builtPlayer = await Promise.all(playerDetailsList.filter(Boolean).map((pokemon) => buildCombatant(pokemon, "player")));
+      const builtEnemy = await Promise.all(enemyDetailsList.filter(Boolean).map((pokemon) => buildCombatant(pokemon, "enemy")));
 
       if (!builtPlayer.length || !builtEnemy.length) {
         throw new Error("Could not assemble teams");
@@ -250,10 +306,10 @@ const BattleMode = ({ team = [], notify, shinyDexMode = false }) => {
   };
 
   useEffect(() => {
-    if (!loading && pokemons.length > 0 && playerTeam.length === 0 && enemyTeam.length === 0) {
+    if (!loading && pokemons.length > 0 && teamNames.length > 0 && playerTeam.length === 0 && enemyTeam.length === 0) {
       loadBattle();
     }
-  }, [loading, pokemons, playerTeam.length, enemyTeam.length]);
+  }, [loading, pokemons, teamNames.length, playerTeam.length, enemyTeam.length]);
 
   const playerMoves = useMemo(() => {
     if (!playerActive?.moves?.length) return [];
@@ -330,7 +386,7 @@ const BattleMode = ({ team = [], notify, shinyDexMode = false }) => {
       return false;
     };
 
-    const executeAttack = (attackerSide, moveType) => {
+    const executeAttack = (attackerSide, move) => {
       const attackerTeam = attackerSide === "player" ? nextPlayerTeam : nextEnemyTeam;
       const defenderTeam = attackerSide === "player" ? nextEnemyTeam : nextPlayerTeam;
       const attackerIdx = attackerSide === "player" ? nextPlayerIdx : nextEnemyIdx;
@@ -340,12 +396,18 @@ const BattleMode = ({ team = [], notify, shinyDexMode = false }) => {
       const defender = defenderTeam[defenderIdx];
       if (!attacker || !defender || attacker.fainted || defender.fainted) return;
 
-      const result = calcDamage(attacker, defender, moveType);
+      const accuracy = Math.max(1, Number(move?.accuracy || 100));
+      if (Math.random() * 100 > accuracy) {
+        pushLog(`${attacker.name} used ${move.type} but missed.`);
+        return;
+      }
+
+      const result = calcDamage(attacker, defender, move);
       const multiplierLabel = result.typeMultiplier === 0 ? "no effect" : `${result.typeMultiplier}x`;
-      pushLog(`${attacker.name} used ${moveType}! ${result.damage} dmg (${multiplierLabel})${result.isCrit ? " CRIT" : ""}`);
+      pushLog(`${attacker.name} used ${move.name}! ${result.damage} dmg (${multiplierLabel})${result.isCrit ? " CRIT" : ""}`);
 
       const damagedTeam = applyDamageToTeam(defenderTeam, defenderIdx, result.damage);
-      const statusInflicted = rollStatusInfliction(moveType, damagedTeam[defenderIdx]);
+      const statusInflicted = rollStatusInfliction(move.type, damagedTeam[defenderIdx]);
       const finalTeam = statusInflicted ? applyStatusToTeam(damagedTeam, defenderIdx, statusInflicted) : damagedTeam;
 
       if (statusInflicted) {
@@ -367,19 +429,19 @@ const BattleMode = ({ team = [], notify, shinyDexMode = false }) => {
 
     if (firstPlayer) {
       if (!maybeParalyzed(nextPlayerTeam[nextPlayerIdx], "player")) {
-        executeAttack("player", playerMove.type);
+        executeAttack("player", playerMove);
       }
       await new Promise((resolve) => setTimeout(resolve, 180));
       if (findNextAliveIndex(nextEnemyTeam, nextEnemyIdx) !== -1 && !maybeParalyzed(nextEnemyTeam[nextEnemyIdx], "enemy")) {
-        executeAttack("enemy", enemyMove.type);
+        executeAttack("enemy", enemyMove);
       }
     } else {
       if (!maybeParalyzed(nextEnemyTeam[nextEnemyIdx], "enemy")) {
-        executeAttack("enemy", enemyMove.type);
+        executeAttack("enemy", enemyMove);
       }
       await new Promise((resolve) => setTimeout(resolve, 180));
       if (findNextAliveIndex(nextPlayerTeam, nextPlayerIdx) !== -1 && !maybeParalyzed(nextPlayerTeam[nextPlayerIdx], "player")) {
-        executeAttack("player", playerMove.type);
+        executeAttack("player", playerMove);
       }
     }
 
@@ -426,9 +488,17 @@ const BattleMode = ({ team = [], notify, shinyDexMode = false }) => {
     let nextEnemyTeam = updateMovePp(enemyTeam, activeEnemyIndex, enemyMoveIdx);
     let nextPlayerTeam = playerTeam;
 
-    const result = calcDamage(nextEnemyTeam[activeEnemyIndex], nextPlayerTeam[targetIndex], enemyMove.type);
+    const accuracy = Math.max(1, Number(enemyMove?.accuracy || 100));
+    if (Math.random() * 100 > accuracy) {
+      pushLog(`${nextEnemyTeam[activeEnemyIndex].name} used ${enemyMove.name} on switch-in but missed.`);
+      setEnemyTeam(nextEnemyTeam);
+      setIsBusy(false);
+      return;
+    }
+
+    const result = calcDamage(nextEnemyTeam[activeEnemyIndex], nextPlayerTeam[targetIndex], enemyMove);
     nextPlayerTeam = applyDamageToTeam(nextPlayerTeam, targetIndex, result.damage);
-    pushLog(`${nextEnemyTeam[activeEnemyIndex].name} used ${enemyMove.type} on switch-in for ${result.damage} dmg.`);
+    pushLog(`${nextEnemyTeam[activeEnemyIndex].name} used ${enemyMove.name} on switch-in for ${result.damage} dmg.`);
 
     const statusInflicted = rollStatusInfliction(enemyMove.type, nextPlayerTeam[targetIndex]);
     if (statusInflicted) {
@@ -495,7 +565,7 @@ const BattleMode = ({ team = [], notify, shinyDexMode = false }) => {
               <option key={name} value={name}>{name}</option>
             ))
           ) : (
-            <option value="">No team Pokemon (random rental)</option>
+            <option value="">Create a team first</option>
           )}
         </select>
 
@@ -505,8 +575,8 @@ const BattleMode = ({ team = [], notify, shinyDexMode = false }) => {
       </div>
 
       <div className="battle-team-summary">
-        <span>Allies Alive: {alivePlayerCount}/6</span>
-        <span>Enemies Alive: {aliveEnemyCount}/6</span>
+        <span>Allies Alive: {alivePlayerCount}/{Math.max(1, playerTeam.length)}</span>
+        <span>Enemies Alive: {aliveEnemyCount}/{Math.max(1, enemyTeam.length)}</span>
       </div>
 
       <div className="battle-field">
