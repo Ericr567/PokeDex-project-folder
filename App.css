@@ -951,20 +951,29 @@ kbd {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .app-frame {
-    padding: 10px;
+    padding: 10px 0;
+  }
+
+  .pokedex-device {
+    width: 100%;
+    border-radius: 16px;
+    border-left: none;
+    border-right: none;
   }
 
   .device-main {
     grid-template-columns: 1fr;
-    padding: 12px;
+    padding: 10px;
+    gap: 10px;
   }
 
-  .control-panel {
-    gap: 12px;
+  .screen-panel {
+    padding: 10px;
+    border-radius: 12px;
   }
 
   .content {
-    padding: 16px;
+    padding: 14px 12px;
   }
 
   .pager-controls {
@@ -1111,19 +1120,15 @@ kbd {
     grid-template-columns: 88px 1fr 36px;
   }
 }
-/* ── Small phone (≤480px): full-screen device, tighter spacing ── */
+/* ── Small phone (≤480px): fully flush screen, tighter spacing ── */
 @media (max-width: 480px) {
-  /* Device fills the entire screen — no gaps on sides */
   .app-frame {
     padding: 0;
     align-items: flex-start;
   }
 
   .pokedex-device {
-    width: 100%;
     border-radius: 0;
-    border-left: none;
-    border-right: none;
     box-shadow: none;
   }
 
