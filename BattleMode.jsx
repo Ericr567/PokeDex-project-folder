@@ -95,17 +95,61 @@ const loadMoveMeta = async (moveEntry, fallbackType) => {
   return request;
 };
 
+const getLevelUpMoveCandidates = (pokemon) => {
+  const seen = new Set();
+
+  const ranked = (pokemon?.moves || [])
+    .map((entry) => {
+      const details = entry?.version_group_details || [];
+      const levelUpDetails = details.filter((detail) => detail?.move_learn_method?.name === "level-up");
+      if (!levelUpDetails.length) return null;
+      const highestLevel = Math.max(...levelUpDetails.map((detail) => Number(detail?.level_learned_at || 0)));
+      return {
+        move: entry.move,
+        level: highestLevel,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (b.level !== a.level) return b.level - a.level;
+      return String(a.move?.name || "").localeCompare(String(b.move?.name || ""));
+    })
+    .filter((entry) => {
+      const key = entry.move?.name;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+  return ranked;
+};
+
 const pickMovesForPokemon = (pokemon, fallbackType) => {
-  const entries = (pokemon?.moves || []).slice(0, 24);
-  if (entries.length === 0) {
+  const levelUpCandidates = getLevelUpMoveCandidates(pokemon);
+  if (levelUpCandidates.length >= 4) {
+    return levelUpCandidates.slice(0, 4).map((entry) => entry.move);
+  }
+
+  const selected = [...levelUpCandidates];
+  const selectedNames = new Set(selected.map((entry) => entry.move?.name));
+  const filler = (pokemon?.moves || [])
+    .map((entry) => entry?.move)
+    .filter((move) => move?.name && !selectedNames.has(move.name));
+
+  for (const move of filler) {
+    if (selected.length >= 4) break;
+    selected.push({ move, level: -1 });
+    selectedNames.add(move.name);
+  }
+
+  if (selected.length === 0) {
     return [
       normalizeMoveMeta({ name: `${fallbackType || "normal"} strike` }, fallbackType),
       normalizeMoveMeta({ name: "quick attack" }, "normal"),
     ];
   }
 
-  const shuffled = [...entries].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, 4);
+  return selected.slice(0, 4).map((entry) => entry.move || entry);
 };
 
 const buildCombatant = async (pokemon, side) => {
