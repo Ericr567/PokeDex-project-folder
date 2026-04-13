@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { usePokemonList } from "./usePokemonList";
 import { trackUxEvent } from "./analytics";
 import WhosThatPokemon from "./WhosThatPokemon";
+import { extractPokemonId } from "./pokemonDetails";
 
 const Home = ({ notify, shinyDexMode = false }) => {
   const navigate = useNavigate();
@@ -43,6 +44,8 @@ const Home = ({ notify, shinyDexMode = false }) => {
     navigate(`/pokemon?name=${random.name}`);
   };
 
+  const featuredPokemonId = extractPokemonId(featuredPokemon);
+
   return (
     <div className="page-shell">
       <h1 className="section-title">Welcome to the Pokédex App</h1>
@@ -65,10 +68,24 @@ const Home = ({ notify, shinyDexMode = false }) => {
         <Link to={`/pokemon?name=${featuredPokemon.name}`}>
           <div className="featured-card" style={{ cursor: "pointer" }}>
             <h2>Featured Pokémon: {featuredPokemon.name}</h2>
-            <img
-              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shinyDexMode ? "shiny/" : ""}${featuredPokemon.id}.png`}
-              alt={featuredPokemon.name}
-            />
+            {featuredPokemonId ? (
+              <img
+                src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shinyDexMode ? "shiny/" : ""}${featuredPokemonId}.png`}
+                alt={featuredPokemon.name}
+                onError={(event) => {
+                  const img = event.currentTarget;
+                  if (shinyDexMode && !img.dataset.fallbackNormal) {
+                    img.dataset.fallbackNormal = "1";
+                    img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${featuredPokemonId}.png`;
+                    return;
+                  }
+                  if (!img.dataset.fallbackMimo) {
+                    img.dataset.fallbackMimo = "1";
+                    img.src = `https://raw.githubusercontent.com/getmimo/things-api/main/files/pokedex/sprites/master/sprites/pokemon/${featuredPokemonId}.png`;
+                  }
+                }}
+              />
+            ) : null}
           </div>
         </Link>
       )}

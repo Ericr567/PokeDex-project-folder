@@ -8,6 +8,7 @@ import { TYPE_COLORS } from "./TypeEffectiveness";
 const PokemonCard = ({ pokemon, details, isFavorite, onToggleFavorite, showShiny = false }) => {
 
   const pokemonId = useMemo(() => extractPokemonId(details || pokemon), [details, pokemon]);
+  const hasPokemonId = Number.isFinite(pokemonId) && pokemonId > 0;
 
   const typeList = details?.types?.map((t) => t.type.name) ?? [];
   const primaryType = typeList[0];
@@ -18,7 +19,9 @@ const PokemonCard = ({ pokemon, details, isFavorite, onToggleFavorite, showShiny
     .slice(0, 2)
     .join(", ");
 
-  const spriteSrc = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${showShiny ? "shiny/" : ""}${pokemonId}.png`;
+  const spriteSrc = hasPokemonId
+    ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${showShiny ? "shiny/" : ""}${pokemonId}.png`
+    : "";
 
   return (
     <div
@@ -34,10 +37,24 @@ const PokemonCard = ({ pokemon, details, isFavorite, onToggleFavorite, showShiny
       </button>
       <Link to={`/pokemon?name=${pokemon.name}`}>
         <div className="card-sprite-wrap">
-          <img
-            src={spriteSrc}
-            alt={pokemon.name}
-          />
+          {hasPokemonId ? (
+            <img
+              src={spriteSrc}
+              alt={pokemon.name}
+              onError={(event) => {
+                const img = event.currentTarget;
+                if (showShiny && !img.dataset.fallbackNormal) {
+                  img.dataset.fallbackNormal = "1";
+                  img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemonId}.png`;
+                  return;
+                }
+                if (!img.dataset.fallbackMimo) {
+                  img.dataset.fallbackMimo = "1";
+                  img.src = `https://raw.githubusercontent.com/getmimo/things-api/main/files/pokedex/sprites/master/sprites/pokemon/${pokemonId}.png`;
+                }
+              }}
+            />
+          ) : null}
         </div>
         <h2>{pokemon?.name}</h2>
         {pokemonId && (
