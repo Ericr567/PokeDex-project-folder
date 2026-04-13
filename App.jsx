@@ -7,6 +7,7 @@ import Search from "./Search";
 import Pokemon from "./Pokemon";
 import TeamBuilder from "./TeamBuilder";
 import ShinyTracker from "./ShinyTracker";
+import BattleMode from "./BattleMode";
 import { fetchPokemonListWithCache } from "./pokemonDetails";
 import { trackUxEvent } from "./analytics";
 
@@ -277,6 +278,11 @@ export default function App() {
         trackUxEvent("shortcut_used", { key: "t" });
       }
 
+      if (event.key.toLowerCase() === "b") {
+        navigateTo("/battle");
+        trackUxEvent("shortcut_used", { key: "b" });
+      }
+
       if (event.key.toLowerCase() === "y") {
         navigateTo("/shinydex");
         trackUxEvent("shortcut_used", { key: "y" });
@@ -377,6 +383,12 @@ export default function App() {
                   Team {team.length > 0 ? `(${team.length}/6)` : ""}
                 </NavLink>
                 <NavLink
+                  to="/battle"
+                  className={({ isActive }) => (isActive ? "active-nav" : "")}
+                >
+                  Battle
+                </NavLink>
+                <NavLink
                   to="/shinydex"
                   className={({ isActive }) => (isActive ? "active-nav" : "")}
                 >
@@ -414,6 +426,10 @@ export default function App() {
                   <Route
                     path="/team"
                     element={<TeamBuilder team={team} onRemove={(name) => setTeam((t) => t.filter((m) => m.name !== name))} />}
+                  />
+                  <Route
+                    path="/battle"
+                    element={<BattleMode team={team} notify={showToast} shinyDexMode={isShinyDexMode} />}
                   />
                   <Route
                     path="/shinydex"
@@ -499,6 +515,7 @@ export default function App() {
             <p><kbd>p</kbd> Go Pokédex</p>
             <p><kbd>s</kbd> Go Search</p>
             <p><kbd>t</kbd> Go Team</p>
+            <p><kbd>b</kbd> Go Battle Mode</p>
             <p><kbd>y</kbd> Go Shiny Tracker</p>
             <p><kbd>?</kbd> Open this help</p>
             <p><kbd>Esc</kbd> Close help</p>
