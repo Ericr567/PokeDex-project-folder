@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PokemonCard from "./PokemonCard";
-import { extractPokemonId, preloadPokemonDetails } from "./pokemonDetails";
+import { extractPokemonId, fetchJsonWithTimeout, preloadPokemonDetails } from "./pokemonDetails";
 import { trackUxEvent } from "./analytics";
 import { usePokemonList } from "./usePokemonList";
 import { TYPE_COLORS } from "./TypeEffectiveness";
@@ -27,7 +27,6 @@ const GENERATION_RANGES = [
 
 const Pokedex = ({ favorites, toggleFavorite, notify }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTypeDetailsRef = useRef(new Set());
 
   const mergeMissingDetails = (current, incoming) => {
     if (!incoming) return current;
@@ -68,7 +67,9 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
   const [typeFilter, setTypeFilter] = useState(() => searchParams.get("type") || "");
   const [genFilter, setGenFilter] = useState(() => Number(searchParams.get("gen")) || 0);
   const [detailsByName, setDetailsByName] = useState({});
+  const [typeEntriesByName, setTypeEntriesByName] = useState({});
   const [isTypeHydrating, setIsTypeHydrating] = useState(false);
+  const [typeLoadError, setTypeLoadError] = useState(null);
   const [copied, setCopied] = useState(false);
   const pokemonsPerPage = 10;
 
@@ -135,72 +136,71 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
     [pokemons, normalizedSearchTerm, favoritesOnly, favorites, genFilter, genRange.min, genRange.max],
   );
 
-  const missingTypeDetailsCount = useMemo(
-    () => (typeFilter
-      ? baseFilteredPokemons.reduce((count, pokemon) => (detailsByName[pokemon.name] ? count : count + 1), 0)
-      : 0),
-    [typeFilter, baseFilteredPokemons, detailsByName],
-  );
+  const isTypeFilterLoading = Boolean(typeFilter) && !typeEntriesByName[typeFilter] && isTypeHydrating;
 
-  const isTypeFilterLoading = Boolean(typeFilter) && (isTypeHydrating || missingTypeDetailsCount > 0);
-
-  // Preload type-filter candidates in small batches to keep mobile responsive.
+  // Load exact Pokemon names for the selected type from the type endpoint.
   useEffect(() => {
     if (!typeFilter) {
+      setTypeLoadError(null);
       setIsTypeHydrating(false);
       return;
     }
 
-    const candidates = baseFilteredPokemons
-      .map((pokemon) => pokemon.name)
-      .filter((name) => !requestedTypeDetailsRef.current.has(name));
-
-    if (candidates.length === 0) {
+    if (typeEntriesByName[typeFilter]) {
+      setTypeLoadError(null);
       setIsTypeHydrating(false);
       return;
     }
 
-    const isMobile = window.matchMedia?.("(max-width: 768px)")?.matches ?? false;
-    const batchSize = isMobile ? 8 : 16;
-    const queue = candidates;
-
-    queue.forEach((name) => requestedTypeDetailsRef.current.add(name));
     setIsTypeHydrating(true);
+    setTypeLoadError(null);
 
     let isCancelled = false;
 
-    const preloadInBatches = async () => {
-      for (let index = 0; index < queue.length; index += batchSize) {
-        if (isCancelled) return;
-        const batch = queue.slice(index, index + batchSize);
-        const details = await preloadPokemonDetails(batch);
-        if (isCancelled) return;
-        setDetailsByName((current) => mergeMissingDetails(current, details));
-        // Yield between batches so touch/scroll stays responsive.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
+    const loadTypeEntries = async () => {
+      try {
+        const response = await fetchJsonWithTimeout(`https://pokeapi.co/api/v2/type/${typeFilter}`);
+        if (!response.ok) {
+          throw new Error("Type request failed");
+        }
 
-      if (!isCancelled) {
-        setIsTypeHydrating(false);
+        const payload = await response.json();
+        const names = (payload?.pokemon || [])
+          .map((entry) => entry?.pokemon?.name)
+          .filter(Boolean);
+
+        if (!isCancelled) {
+          setTypeEntriesByName((current) => {
+            if (current[typeFilter]) return current;
+            return { ...current, [typeFilter]: new Set(names) };
+          });
+        }
+      } catch {
+        if (!isCancelled) {
+          setTypeLoadError("Could not load entries for this type. Retry.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsTypeHydrating(false);
+        }
       }
     };
 
-    preloadInBatches();
+    loadTypeEntries();
 
     return () => {
       isCancelled = true;
-      setIsTypeHydrating(false);
     };
-  }, [typeFilter, baseFilteredPokemons, detailsByName]);
+  }, [typeFilter, typeEntriesByName]);
 
   const filteredPokemons = useMemo(
     () => baseFilteredPokemons.filter((pokemon) => {
       if (!typeFilter) return true;
-      const details = detailsByName[pokemon.name];
-      if (!details) return false;
-      return details.types?.some((t) => t.type.name === typeFilter);
+      const typeEntries = typeEntriesByName[typeFilter];
+      if (!typeEntries) return false;
+      return typeEntries.has(pokemon.name);
     }),
-    [baseFilteredPokemons, typeFilter, detailsByName],
+    [baseFilteredPokemons, typeFilter, typeEntriesByName],
   );
 
   const sortedPokemons = useMemo(() => [...filteredPokemons].sort((a, b) => {
@@ -272,6 +272,17 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
     trackUxEvent("retry_clicked", { page: "pokedex" });
   };
 
+  const handleRetryTypeLoad = () => {
+    if (!typeFilter) return;
+    setTypeLoadError(null);
+    setTypeEntriesByName((current) => {
+      if (!current[typeFilter]) return current;
+      const next = { ...current };
+      delete next[typeFilter];
+      return next;
+    });
+  };
+
   const clearFilters = () => {
     setSearchTerm("");
     setSortMode("id-asc");
@@ -298,6 +309,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
         <span>
           Filters: {activeFilterLabels.length > 0 ? activeFilterLabels.join(" • ") : "None"}
           {isTypeFilterLoading ? " • Loading type entries..." : ""}
+          {typeLoadError ? " • Type load failed" : ""}
         </span>
         <button className="status-clear" type="button" onClick={clearFilters}>
           Clear Filters
@@ -308,6 +320,12 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
         <div className="status-error" role="alert">
           <p>Error: {error}</p>
           <button className="app-button" type="button" onClick={handleRetry}>Retry</button>
+        </div>
+      )}
+      {!error && typeLoadError && (
+        <div className="status-error" role="alert">
+          <p>Error: {typeLoadError}</p>
+          <button className="app-button" type="button" onClick={handleRetryTypeLoad}>Retry</button>
         </div>
       )}
       {!loading && !isTypeFilterLoading && !error && currentPokemons.length === 0 && (
