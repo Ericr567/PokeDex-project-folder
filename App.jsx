@@ -44,6 +44,13 @@ export default function App() {
       return false;
     }
   });
+  const [isShinyDexMode, setIsShinyDexMode] = useState(() => {
+    try {
+      return localStorage.getItem("pokedex-shiny-mode") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [toast, setToast] = useState(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -85,6 +92,10 @@ export default function App() {
     localStorage.setItem("pokedex-dark-mode", String(isDarkMode));
     document.body.classList.toggle("dark-mode", isDarkMode);
   }, [isDarkMode]);
+
+  useEffect(() => {
+    localStorage.setItem("pokedex-shiny-mode", String(isShinyDexMode));
+  }, [isShinyDexMode]);
 
   useEffect(() => {
     if (!isBooting) return;
@@ -313,19 +324,19 @@ export default function App() {
                 <Routes>
                   <Route
                     path="/"
-                    element={<Home favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} />}
+                    element={<Home favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} shinyDexMode={isShinyDexMode} />}
                   />
                   <Route
                     path="/pokedex"
-                    element={<Pokedex favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} />}
+                    element={<Pokedex favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} shinyDexMode={isShinyDexMode} />}
                   />
                   <Route
                     path="/search"
-                    element={<Search favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} />}
+                    element={<Search favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} shinyDexMode={isShinyDexMode} />}
                   />
                   <Route
                     path="/pokemon"
-                    element={<Pokemon favorites={favorites} toggleFavorite={toggleFavorite} team={team} toggleTeam={toggleTeam} notify={showToast} />}
+                    element={<Pokemon favorites={favorites} toggleFavorite={toggleFavorite} team={team} toggleTeam={toggleTeam} notify={showToast} shinyDexMode={isShinyDexMode} />}
                   />
                   <Route
                     path="/team"
@@ -353,6 +364,18 @@ export default function App() {
                 type="button"
               >
                 Replay Boot
+              </button>
+
+              <button
+                className={`theme-toggle shiny-mode-toggle ${isShinyDexMode ? "shiny-mode-active" : ""}`}
+                onClick={() => {
+                  playDeviceClick();
+                  setIsShinyDexMode((current) => !current);
+                  showToast(!isShinyDexMode ? "Shiny Dex enabled" : "Shiny Dex disabled", "info");
+                }}
+                type="button"
+              >
+                {isShinyDexMode ? "Shiny: ON" : "Shiny: OFF"}
               </button>
 
               <div className="dpad">

@@ -5,7 +5,7 @@ import "./PokemonCard.css";
 import { extractPokemonId } from "./pokemonDetails";
 import { TYPE_COLORS } from "./TypeEffectiveness";
 
-const PokemonCard = ({ pokemon, details, isFavorite, onToggleFavorite }) => {
+const PokemonCard = ({ pokemon, details, isFavorite, onToggleFavorite, showShiny = false }) => {
 
   const pokemonId = useMemo(() => extractPokemonId(details || pokemon), [details, pokemon]);
 
@@ -17,6 +17,8 @@ const PokemonCard = ({ pokemon, details, isFavorite, onToggleFavorite }) => {
     ?.map((ability) => ability.ability.name)
     .slice(0, 2)
     .join(", ");
+
+  const spriteSrc = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${showShiny ? "shiny/" : ""}${pokemonId}.png`;
 
   return (
     <div
@@ -33,7 +35,7 @@ const PokemonCard = ({ pokemon, details, isFavorite, onToggleFavorite }) => {
       <Link to={`/pokemon?name=${pokemon.name}`}>
         <div className="card-sprite-wrap">
           <img
-            src={`https://raw.githubusercontent.com/getmimo/things-api/main/files/pokedex/sprites/master/sprites/pokemon/${pokemonId}.png`}
+            src={spriteSrc}
             alt={pokemon.name}
           />
         </div>

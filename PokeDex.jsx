@@ -25,7 +25,7 @@ const GENERATION_RANGES = [
   { label: "Gen IX", min: 906, max: Infinity },
 ];
 
-const Pokedex = ({ favorites, toggleFavorite, notify }) => {
+const Pokedex = ({ favorites, toggleFavorite, notify, shinyDexMode = false }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const mergeMissingDetails = (current, incoming) => {
@@ -432,6 +432,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
               details={detailsByName[pokemon.name]}
               isFavorite={favorites.includes(pokemon.name)}
               onToggleFavorite={toggleFavorite}
+              showShiny={shinyDexMode}
             />
           ))}
         </ul>

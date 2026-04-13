@@ -343,6 +343,23 @@ nav a:focus-visible,
   background: #a7221c;
 }
 
+.shiny-mode-toggle {
+  border-color: #ffe082;
+  color: #ffe082;
+  background: #5a3f0a;
+}
+
+.shiny-mode-toggle:hover {
+  background: #70520f;
+}
+
+.shiny-mode-active {
+  border-color: #ffef8a;
+  color: #2c2000;
+  background: linear-gradient(180deg, #ffe98b 0%, #f9c93c 100%);
+  box-shadow: 0 0 10px rgba(255, 222, 110, 0.55);
+}
+
 .dpad {
   width: 110px;
   height: 110px;
@@ -1383,6 +1400,17 @@ body.dark-mode .replay-toggle {
   background: #40211f;
   border-color: #f0b856;
   color: #f0b856;
+}
+
+body.dark-mode .shiny-mode-toggle {
+  background: #5f460f;
+  border-color: #f7d775;
+  color: #f7d775;
+}
+
+body.dark-mode .shiny-mode-active {
+  background: linear-gradient(180deg, #f7d775 0%, #e7ae24 100%);
+  color: #231800;
 }
 
 body.dark-mode .active-nav {

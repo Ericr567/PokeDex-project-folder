@@ -4,7 +4,7 @@ import { usePokemonList } from "./usePokemonList";
 import { trackUxEvent } from "./analytics";
 import WhosThatPokemon from "./WhosThatPokemon";
 
-const Home = ({ notify }) => {
+const Home = ({ notify, shinyDexMode = false }) => {
   const navigate = useNavigate();
   const [featuredPokemon, setFeaturedPokemon] = useState(null);
   const [activeFactIndex, setActiveFactIndex] = useState(0);
@@ -66,7 +66,7 @@ const Home = ({ notify }) => {
           <div className="featured-card" style={{ cursor: "pointer" }}>
             <h2>Featured Pokémon: {featuredPokemon.name}</h2>
             <img
-              src={`https://raw.githubusercontent.com/getmimo/things-api/main/files/pokedex/sprites/master/sprites/pokemon/${featuredPokemon.id}.png`}
+              src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${shinyDexMode ? "shiny/" : ""}${featuredPokemon.id}.png`}
               alt={featuredPokemon.name}
             />
           </div>

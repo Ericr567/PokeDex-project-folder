@@ -7,7 +7,7 @@ import { preloadPokemonDetails } from "./pokemonDetails";
 import { trackUxEvent } from "./analytics";
 import { usePokemonList } from "./usePokemonList";
 
-const Search = ({ favorites, toggleFavorite, notify }) => {
+const Search = ({ favorites, toggleFavorite, notify, shinyDexMode = false }) => {
   const searchInputRef = React.useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [filteredPokemons, setFilteredPokemons] = useState([]);
@@ -163,6 +163,7 @@ const Search = ({ favorites, toggleFavorite, notify }) => {
               details={detailsByName[pokemon.name]}
               isFavorite={favorites.includes(pokemon.name)}
               onToggleFavorite={toggleFavorite}
+              showShiny={shinyDexMode}
             />
           ))}
         </ul>

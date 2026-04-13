@@ -11,7 +11,7 @@ import { TYPE_COLORS } from "./TypeEffectiveness";
 /**
  * Pokemon component for displaying detailed information of a specific Pokémon.
  */
-const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam }) => {
+const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam, shinyDexMode = false }) => {
   const [pokemon, setPokemon] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -26,7 +26,7 @@ const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam }) => {
 
     const fetchPokemon = async () => {
       setLoading(true);
-      setShowShiny(false);
+      setShowShiny(Boolean(shinyDexMode));
       setEvolutionChain(null);
 
       if (!pokemonName) {
@@ -75,6 +75,10 @@ const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam }) => {
       isCancelled = true;
     };
   }, [pokemonName]);
+
+  useEffect(() => {
+    setShowShiny(Boolean(shinyDexMode));
+  }, [shinyDexMode, pokemonName]);
 
   const typeAccentMap = {
     normal: "#a8a77a",
