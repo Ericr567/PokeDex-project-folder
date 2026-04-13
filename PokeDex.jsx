@@ -29,6 +29,27 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTypeDetailsRef = useRef(new Set());
 
+  const mergeMissingDetails = (current, incoming) => {
+    if (!incoming) return current;
+
+    let next = current;
+    let changed = false;
+
+    for (const [name, details] of Object.entries(incoming)) {
+      if (!details) continue;
+      if (next[name]) continue;
+
+      if (!changed) {
+        next = { ...current };
+        changed = true;
+      }
+
+      next[name] = details;
+    }
+
+    return changed ? next : current;
+  };
+
   const getInitialSortMode = () => {
     const value = searchParams.get("sort");
     const allowedModes = ["id-asc", "id-desc", "name-asc", "name-desc"];
@@ -119,7 +140,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
 
     const candidates = baseFilteredPokemons
       .map((pokemon) => pokemon.name)
-      .filter((name) => !detailsByName[name] && !requestedTypeDetailsRef.current.has(name));
+      .filter((name) => !requestedTypeDetailsRef.current.has(name));
 
     if (candidates.length === 0) return;
 
@@ -138,7 +159,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
         const batch = queue.slice(index, index + batchSize);
         const details = await preloadPokemonDetails(batch);
         if (isCancelled) return;
-        setDetailsByName((current) => ({ ...current, ...details }));
+        setDetailsByName((current) => mergeMissingDetails(current, details));
         // Yield between batches so touch/scroll stays responsive.
         await new Promise((resolve) => setTimeout(resolve, 0));
       }
@@ -149,7 +170,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
     return () => {
       isCancelled = true;
     };
-  }, [typeFilter, baseFilteredPokemons, detailsByName]);
+  }, [typeFilter, baseFilteredPokemons]);
 
   const filteredPokemons = useMemo(
     () => baseFilteredPokemons.filter((pokemon) => {
@@ -184,7 +205,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
   useEffect(() => {
     if (currentPokemons.length === 0) return;
     preloadPokemonDetails(currentPokemons.map((pokemon) => pokemon.name)).then((details) => {
-      setDetailsByName((currentDetails) => ({ ...currentDetails, ...details }));
+      setDetailsByName((currentDetails) => mergeMissingDetails(currentDetails, details));
     });
   }, [currentPokemons]);
 
