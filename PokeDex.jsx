@@ -1,8 +1,29 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import PokemonCard from "./PokemonCard";
-import { extractPokemonId, fetchPokemonListWithCache, preloadPokemonDetails } from "./pokemonDetails";
+import { extractPokemonId, preloadPokemonDetails } from "./pokemonDetails";
 import { trackUxEvent } from "./analytics";
+import { usePokemonList } from "./usePokemonList";
+import { TYPE_COLORS } from "./TypeEffectiveness";
+
+const POKEMON_TYPES = [
+  "normal", "fire", "water", "electric", "grass", "ice",
+  "fighting", "poison", "ground", "flying", "psychic", "bug",
+  "rock", "ghost", "dragon", "dark", "steel", "fairy",
+];
+
+const GENERATION_RANGES = [
+  { label: "All", min: 0, max: Infinity },
+  { label: "Gen I", min: 1, max: 151 },
+  { label: "Gen II", min: 152, max: 251 },
+  { label: "Gen III", min: 252, max: 386 },
+  { label: "Gen IV", min: 387, max: 493 },
+  { label: "Gen V", min: 494, max: 649 },
+  { label: "Gen VI", min: 650, max: 721 },
+  { label: "Gen VII", min: 722, max: 809 },
+  { label: "Gen VIII", min: 810, max: 905 },
+  { label: "Gen IX", min: 906, max: Infinity },
+];
 
 const Pokedex = ({ favorites, toggleFavorite, notify }) => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -18,52 +39,26 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
     return Number.isFinite(pageValue) && pageValue > 0 ? Math.floor(pageValue) : 1;
   };
 
-  const [pokemons, setPokemons] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [reloadToken, setReloadToken] = useState(0);
   const [currentPage, setCurrentPage] = useState(getInitialPage);
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get("q") || "");
   const [sortMode, setSortMode] = useState(getInitialSortMode);
   const [favoritesOnly, setFavoritesOnly] = useState(() => searchParams.get("fav") === "1");
+  const [typeFilter, setTypeFilter] = useState(() => searchParams.get("type") || "");
+  const [genFilter, setGenFilter] = useState(() => Number(searchParams.get("gen")) || 0);
   const [detailsByName, setDetailsByName] = useState({});
   const [copied, setCopied] = useState(false);
   const pokemonsPerPage = 10;
 
+  const { pokemons, loading, error, retry } = usePokemonList({ notify, pageName: "pokedex" });
+
+  // Eagerly preload all Pokémon details whenever the type filter is active so
+  // filtering by type has complete coverage even before the user browses pages.
   useEffect(() => {
-    let isCancelled = false;
-    const controller = new AbortController();
-
-    const fetchPokemons = async () => {
-      try {
-        const { data, source } = await fetchPokemonListWithCache({ signal: controller.signal });
-        if (!isCancelled) {
-          setPokemons(data);
-          setError(null);
-          if (source === "cache") {
-            notify?.("Using cached Pokémon data", "warn");
-            trackUxEvent("cache_fallback_used", { page: "pokedex" });
-          }
-        }
-      } catch (error) {
-        if (!isCancelled) {
-          setPokemons([]);
-          setError(error.name === "AbortError" ? "Request timed out. Please retry." : error.message);
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchPokemons();
-
-    return () => {
-      isCancelled = true;
-      controller.abort();
-    };
-  }, [reloadToken]);
+    if (!typeFilter || pokemons.length === 0) return;
+    preloadPokemonDetails(pokemons.map((p) => p.name)).then((details) => {
+      setDetailsByName((current) => ({ ...current, ...details }));
+    });
+  }, [typeFilter, pokemons]);
 
   // Keep component state in sync when user navigates browser history (back/forward).
   useEffect(() => {
@@ -71,11 +66,15 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
     const nextSortMode = getInitialSortMode();
     const nextFavoritesOnly = searchParams.get("fav") === "1";
     const nextPage = getInitialPage();
+    const nextTypeFilter = searchParams.get("type") || "";
+    const nextGenFilter = Number(searchParams.get("gen")) || 0;
 
     setSearchTerm((current) => (current === nextSearchTerm ? current : nextSearchTerm));
     setSortMode((current) => (current === nextSortMode ? current : nextSortMode));
     setFavoritesOnly((current) => (current === nextFavoritesOnly ? current : nextFavoritesOnly));
     setCurrentPage((current) => (current === nextPage ? current : nextPage));
+    setTypeFilter((current) => (current === nextTypeFilter ? current : nextTypeFilter));
+    setGenFilter((current) => (current === nextGenFilter ? current : nextGenFilter));
   }, [searchParams]);
 
   // Persist filter/sort/page state into the URL so links are shareable and restorable.
@@ -94,17 +93,36 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
     if (currentPage > 1) {
       nextParams.set("page", String(currentPage));
     }
+    if (typeFilter) {
+      nextParams.set("type", typeFilter);
+    }
+    if (genFilter) {
+      nextParams.set("gen", String(genFilter));
+    }
 
     if (nextParams.toString() !== searchParams.toString()) {
       setSearchParams(nextParams, { replace: true });
     }
-  }, [searchTerm, sortMode, favoritesOnly, currentPage, searchParams, setSearchParams]);
+  }, [searchTerm, sortMode, favoritesOnly, currentPage, typeFilter, genFilter, searchParams, setSearchParams]);
 
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
 
+  const genRange = GENERATION_RANGES[genFilter] ?? GENERATION_RANGES[0];
+
   const filteredPokemons = pokemons
     .filter((pokemon) => pokemon.name.toLowerCase().includes(normalizedSearchTerm))
-    .filter((pokemon) => (favoritesOnly ? favorites.includes(pokemon.name) : true));
+    .filter((pokemon) => (favoritesOnly ? favorites.includes(pokemon.name) : true))
+    .filter((pokemon) => {
+      if (!genFilter) return true;
+      const id = extractPokemonId(pokemon);
+      return id >= genRange.min && id <= genRange.max;
+    })
+    .filter((pokemon) => {
+      if (!typeFilter) return true;
+      const details = detailsByName[pokemon.name];
+      if (!details) return false;
+      return details.types?.some((t) => t.type.name === typeFilter);
+    });
 
   const sortedPokemons = [...filteredPokemons].sort((a, b) => {
     if (sortMode === "name-asc") {
@@ -171,10 +189,7 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
   };
 
   const handleRetry = () => {
-    setLoading(true);
-    setError(null);
-    setReloadToken((current) => current + 1);
-    notify?.("Retrying Pokédex fetch", "info");
+    retry("Retrying Pokédex fetch");
     trackUxEvent("retry_clicked", { page: "pokedex" });
   };
 
@@ -183,6 +198,8 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
     setSortMode("id-asc");
     setFavoritesOnly(false);
     setCurrentPage(1);
+    setTypeFilter("");
+    setGenFilter(0);
     notify?.("Filters reset", "info");
     trackUxEvent("filters_cleared", { page: "pokedex" });
   };
@@ -191,6 +208,8 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
   if (normalizedSearchTerm) activeFilterLabels.push(`Search: ${searchTerm.trim()}`);
   if (sortMode !== "id-asc") activeFilterLabels.push(`Sort: ${sortMode}`);
   if (favoritesOnly) activeFilterLabels.push("Favorites only");
+  if (typeFilter) activeFilterLabels.push(`Type: ${typeFilter}`);
+  if (genFilter) activeFilterLabels.push(GENERATION_RANGES[genFilter]?.label ?? "");
 
   return (
     <div className="page-shell">
@@ -250,6 +269,40 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
         <button className="share-button" type="button" onClick={handleCopyLink}>
           {copied ? "Copied!" : "Copy Link"}
         </button>
+      </div>
+
+      <div className="gen-filter-row" role="group" aria-label="Filter by generation">
+        {GENERATION_RANGES.map((gen, i) => (
+          <button
+            key={gen.label}
+            className={`gen-btn ${genFilter === i ? "gen-btn-active" : ""}`}
+            type="button"
+            onClick={() => { setGenFilter(i); setCurrentPage(1); }}
+          >
+            {gen.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="type-filter-row" role="group" aria-label="Filter by type">
+        <button
+          className={`type-filter-btn type-filter-btn-all ${!typeFilter ? "type-filter-btn-active" : ""}`}
+          type="button"
+          onClick={() => { setTypeFilter(""); setCurrentPage(1); }}
+        >
+          All Types
+        </button>
+        {POKEMON_TYPES.map((type) => (
+          <button
+            key={type}
+            className={`type-filter-btn ${typeFilter === type ? "type-filter-btn-active" : ""}`}
+            style={{ background: TYPE_COLORS[type] }}
+            type="button"
+            onClick={() => { setTypeFilter(typeFilter === type ? "" : type); setCurrentPage(1); }}
+          >
+            {type}
+          </button>
+        ))}
       </div>
 
       <div className="quick-actions" role="group" aria-label="Pokedex quick actions">

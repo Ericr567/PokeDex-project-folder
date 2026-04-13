@@ -1240,3 +1240,265 @@ body.dark-mode .stat-track {
   background: #2d2d2d;
   border-color: #4a4a4a;
 }
+
+/* =====================================================
+   NEW FEATURE STYLES
+   ===================================================== */
+
+/* --- Type chips --- */
+.type-chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 8px;
+  text-transform: capitalize;
+  letter-spacing: 0.3px;
+  color: #fff;
+  margin: 2px;
+  vertical-align: middle;
+}
+
+/* --- Type filter row (Pokédex) --- */
+.type-filter-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.type-filter-btn {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  font-family: "Press Start 2P", sans-serif;
+  font-size: 7px;
+  padding: 5px 9px;
+  cursor: pointer;
+  color: #fff;
+  text-transform: capitalize;
+  opacity: 0.72;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.type-filter-btn-all {
+  background: #555;
+}
+
+.type-filter-btn:hover,
+.type-filter-btn-active {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.75);
+}
+
+/* --- Generation filter row --- */
+.gen-filter-row {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.gen-btn {
+  border: 1px solid #d13325;
+  background: transparent;
+  color: #d13325;
+  border-radius: 999px;
+  font-family: "Press Start 2P", sans-serif;
+  font-size: 7px;
+  padding: 6px 9px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.gen-btn:hover {
+  background: #ffe8a8;
+}
+
+.gen-btn-active {
+  background: #d13325;
+  color: #f7e39c;
+}
+
+/* --- Type Effectiveness panel --- */
+.type-effectiveness {
+  width: min(100%, 680px);
+  margin-top: 10px;
+  border: 1px solid #f0dfaa;
+  border-radius: 10px;
+  background: #fffdf2;
+  padding: 12px;
+}
+
+.eff-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.eff-label {
+  font-size: 8px;
+  min-width: 68px;
+  text-align: right;
+  font-weight: bold;
+}
+
+.eff-x4    { color: #6b0000; }
+.eff-x2    { color: #c22e28; }
+.eff-half  { color: #3869b8; }
+.eff-quarter { color: #2d5f99; }
+.eff-immune  { color: #555; }
+
+.eff-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* --- Evolution chain --- */
+.evolution-chain {
+  width: min(100%, 680px);
+  margin-top: 12px;
+  border: 1px solid #f0dfaa;
+  border-radius: 10px;
+  background: #fffdf2;
+  padding: 12px;
+}
+
+.evolution-stages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.evolution-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+  gap: 4px;
+}
+
+.evolution-current .evolution-name {
+  color: #d13325;
+  font-weight: bold;
+}
+
+.evolution-sprite {
+  width: 72px;
+  height: 72px;
+  image-rendering: pixelated;
+  transition: transform 0.2s;
+}
+
+.evolution-stage:hover .evolution-sprite {
+  transform: scale(1.1);
+}
+
+.evolution-name {
+  font-size: 8px;
+  text-transform: capitalize;
+  color: #444;
+}
+
+.evolution-arrow {
+  font-size: 16px;
+  color: #d13325;
+  margin: 0 2px;
+}
+
+/* --- Shiny toggle --- */
+.sprite-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.shiny-toggle {
+  border: 1px solid #d13325;
+  background: #fff8df;
+  color: #d13325;
+  border-radius: 999px;
+  font-family: "Press Start 2P", sans-serif;
+  font-size: 9px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.shiny-toggle:hover {
+  background: #ffe9b7;
+}
+
+.shiny-active {
+  background: #fff3b0;
+  border-color: #e8a000;
+  color: #7a4800;
+}
+
+/* --- Detail page layout helpers --- */
+.detail-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.detail-types {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* --- Stats panel with chart toggle --- */
+.stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.stats-header .stats-title {
+  margin: 0;
+}
+
+/* --- Dark mode additions --- */
+body.dark-mode .type-effectiveness,
+body.dark-mode .evolution-chain {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+body.dark-mode .eff-label,
+body.dark-mode .evolution-name {
+  color: #ccc;
+}
+
+body.dark-mode .gen-btn {
+  border-color: #e06050;
+  color: #e06050;
+}
+
+body.dark-mode .gen-btn-active {
+  background: #c03020;
+  color: #f7e39c;
+}
+
+body.dark-mode .type-filter-btn-all {
+  background: #444;
+}

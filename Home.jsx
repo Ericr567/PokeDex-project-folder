@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { fetchPokemonListWithCache } from "./pokemonDetails";
+import { Link, useNavigate } from "react-router-dom";
+import { usePokemonList } from "./usePokemonList";
 import { trackUxEvent } from "./analytics";
+import WhosThatPokemon from "./WhosThatPokemon";
 
 const Home = ({ notify }) => {
+  const navigate = useNavigate();
   const [featuredPokemon, setFeaturedPokemon] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [reloadToken, setReloadToken] = useState(0);
   const [activeFactIndex, setActiveFactIndex] = useState(0);
   const funFacts = [
     "Pikachu was not the first Pokemon designed.",
@@ -15,41 +14,13 @@ const Home = ({ notify }) => {
     "The 'Pokémon' name is a blend of 'Pocket Monsters'.",
   ];
 
+  const { pokemons, loading, error, retry } = usePokemonList({ notify, pageName: "home" });
+
   useEffect(() => {
-    let isCancelled = false;
-    const controller = new AbortController();
-
-    const fetchFeaturedPokemon = async () => {
-      try {
-        const { data, source } = await fetchPokemonListWithCache({ signal: controller.signal });
-        const randomPokemon = data[Math.floor(Math.random() * data.length)];
-        if (!isCancelled) {
-          setFeaturedPokemon(randomPokemon);
-          setError(null);
-          if (source === "cache") {
-            notify?.("Using cached Pokémon data", "warn");
-            trackUxEvent("cache_fallback_used", { page: "home" });
-          }
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          setFeaturedPokemon(null);
-          setError(err.name === "AbortError" ? "Request timed out. Please retry." : err.message);
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchFeaturedPokemon();
-
-    return () => {
-      isCancelled = true;
-      controller.abort();
-    };
-  }, [reloadToken]);
+    if (pokemons.length > 0 && !featuredPokemon) {
+      setFeaturedPokemon(pokemons[Math.floor(Math.random() * pokemons.length)]);
+    }
+  }, [pokemons, featuredPokemon]);
 
   useEffect(() => {
     const factTimer = setInterval(() => {
@@ -60,11 +31,16 @@ const Home = ({ notify }) => {
   }, [funFacts.length]);
 
   const handleRetry = () => {
-    setLoading(true);
-    setError(null);
-    setReloadToken((current) => current + 1);
-    notify?.("Retrying featured fetch", "info");
+    setFeaturedPokemon(null);
+    retry("Retrying featured fetch");
     trackUxEvent("retry_clicked", { page: "home" });
+  };
+
+  const handleRandomPokemon = () => {
+    if (!pokemons.length) return;
+    const random = pokemons[Math.floor(Math.random() * pokemons.length)];
+    trackUxEvent("random_pokemon_navigated", { name: random.name });
+    navigate(`/pokemon?name=${random.name}`);
   };
 
   return (
@@ -96,6 +72,16 @@ const Home = ({ notify }) => {
           </div>
         </Link>
       )}
+      <button
+        className="app-button"
+        type="button"
+        onClick={handleRandomPokemon}
+        disabled={!pokemons.length}
+        style={{ marginBottom: "16px" }}
+      >
+        Random Pokémon
+      </button>
+      <WhosThatPokemon pokemons={pokemons} />
       <div className="fact-box">
         <h3>Fun Pokémon Fact:</h3>
         <p key={activeFactIndex} className="fact-text">{funFacts[activeFactIndex]}</p>

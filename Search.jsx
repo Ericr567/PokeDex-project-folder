@@ -3,55 +3,19 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import "./Search.css";
 import PokemonCard from "./PokemonCard";
-import { fetchPokemonListWithCache, preloadPokemonDetails } from "./pokemonDetails";
+import { preloadPokemonDetails } from "./pokemonDetails";
 import { trackUxEvent } from "./analytics";
+import { usePokemonList } from "./usePokemonList";
 
 const Search = ({ favorites, toggleFavorite, notify }) => {
   const searchInputRef = React.useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [pokemons, setPokemons] = useState([]);
   const [filteredPokemons, setFilteredPokemons] = useState([]);
   const [input, setInput] = useState(() => searchParams.get("q") || "");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [reloadToken, setReloadToken] = useState(0);
   const [detailsByName, setDetailsByName] = useState({});
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    let isCancelled = false;
-    const controller = new AbortController();
-
-    const fetchPokemons = async () => {
-      try {
-        const { data, source } = await fetchPokemonListWithCache({ signal: controller.signal });
-        if (!isCancelled) {
-          setPokemons(data);
-          setError(null);
-          if (source === "cache") {
-            notify?.("Using cached Pokémon data", "warn");
-            trackUxEvent("cache_fallback_used", { page: "search" });
-          }
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          setPokemons([]);
-          setError(err.name === "AbortError" ? "Request timed out. Please retry." : err.message);
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchPokemons();
-
-    return () => {
-      isCancelled = true;
-      controller.abort();
-    };
-  }, [reloadToken]);
+  const { pokemons, loading, error, retry } = usePokemonList({ notify, pageName: "search" });
 
   // Sync input when URL changes via browser navigation (back/forward buttons).
   useEffect(() => {
@@ -115,10 +79,7 @@ const Search = ({ favorites, toggleFavorite, notify }) => {
   };
 
   const handleRetry = () => {
-    setLoading(true);
-    setError(null);
-    setReloadToken((current) => current + 1);
-    notify?.("Retrying search fetch", "info");
+    retry("Retrying search fetch");
     trackUxEvent("retry_clicked", { page: "search" });
   };
 

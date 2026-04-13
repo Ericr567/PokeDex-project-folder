@@ -5,6 +5,8 @@ import Home from "./Home.jsx";
 import Pokedex from "./PokeDex";
 import Search from "./Search";
 import Pokemon from "./Pokemon";
+import TeamBuilder from "./TeamBuilder";
+import { fetchPokemonListWithCache } from "./pokemonDetails";
 import { trackUxEvent } from "./analytics";
 
 export default function App() {
@@ -21,6 +23,15 @@ export default function App() {
     try {
       const storedFavorites = localStorage.getItem("pokedex-favorites");
       return storedFavorites ? JSON.parse(storedFavorites) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [team, setTeam] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pokedex-team");
+      return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
     }
@@ -67,6 +78,10 @@ export default function App() {
   }, [favorites]);
 
   useEffect(() => {
+    localStorage.setItem("pokedex-team", JSON.stringify(team));
+  }, [team]);
+
+  useEffect(() => {
     localStorage.setItem("pokedex-dark-mode", String(isDarkMode));
     document.body.classList.toggle("dark-mode", isDarkMode);
   }, [isDarkMode]);
@@ -100,6 +115,36 @@ export default function App() {
       trackUxEvent("favorite_added", { name });
       return [...currentFavorites, name];
     });
+  };
+
+  const toggleTeam = (pokemon) => {
+    if (!pokemon?.name) return;
+    setTeam((current) => {
+      const exists = current.some((m) => m.name === pokemon.name);
+      if (exists) {
+        showToast(`${pokemon.name} removed from team`, "warn");
+        trackUxEvent("team_removed", { name: pokemon.name });
+        return current.filter((m) => m.name !== pokemon.name);
+      }
+      if (current.length >= 6) {
+        showToast("Team is full (max 6)", "warn");
+        return current;
+      }
+      showToast(`${pokemon.name} added to team`, "success");
+      trackUxEvent("team_added", { name: pokemon.name });
+      return [...current, { name: pokemon.name, id: pokemon.id }];
+    });
+  };
+
+  const handleRandomPokemon = async (navigate) => {
+    try {
+      const { data } = await fetchPokemonListWithCache({});
+      const random = data[Math.floor(Math.random() * data.length)];
+      navigate(`/pokemon?name=${random.name}`);
+      trackUxEvent("random_pokemon_navigated", { name: random.name });
+    } catch {
+      showToast("Could not load Pokémon list", "warn");
+    }
   };
 
   useEffect(() => {
@@ -151,6 +196,12 @@ export default function App() {
       if (event.key.toLowerCase() === "s") {
         navigateTo("/search");
         trackUxEvent("shortcut_used", { key: "s" });
+        return;
+      }
+
+      if (event.key.toLowerCase() === "t") {
+        navigateTo("/team");
+        trackUxEvent("shortcut_used", { key: "t" });
       }
     };
 
@@ -240,6 +291,12 @@ export default function App() {
                 >
                   Search
                 </NavLink>
+                <NavLink
+                  to="/team"
+                  className={({ isActive }) => (isActive ? "active-nav" : "")}
+                >
+                  Team {team.length > 0 ? `(${team.length}/6)` : ""}
+                </NavLink>
               </nav>
 
               <div className="content">
@@ -267,7 +324,11 @@ export default function App() {
                   />
                   <Route
                     path="/pokemon"
-                    element={<Pokemon favorites={favorites} toggleFavorite={toggleFavorite} notify={showToast} />}
+                    element={<Pokemon favorites={favorites} toggleFavorite={toggleFavorite} team={team} toggleTeam={toggleTeam} notify={showToast} />}
+                  />
+                  <Route
+                    path="/team"
+                    element={<TeamBuilder team={team} onRemove={(name) => setTeam((t) => t.filter((m) => m.name !== name))} />}
                   />
                 </Routes>
               </div>
@@ -326,6 +387,7 @@ export default function App() {
             <p><kbd>h</kbd> Go Home</p>
             <p><kbd>p</kbd> Go Pokédex</p>
             <p><kbd>s</kbd> Go Search</p>
+            <p><kbd>t</kbd> Go Team</p>
             <p><kbd>?</kbd> Open this help</p>
             <p><kbd>Esc</kbd> Close help</p>
             <button className="app-button" type="button" onClick={() => setIsHelpOpen(false)}>Close</button>

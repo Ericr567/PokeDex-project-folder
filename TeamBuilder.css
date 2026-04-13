@@ -1,0 +1,73 @@
+/* TeamBuilder.css */
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  width: min(100%, 660px);
+  margin: 16px 0;
+}
+
+.team-slot {
+  border-radius: 10px;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 200px;
+  justify-content: center;
+}
+
+.team-slot-empty {
+  border: 2px dashed #f0dfaa;
+  background: #fff8df;
+}
+
+.team-slot-filled {
+  border: 1px solid #f0dfaa;
+  background: #fffdf5;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+.team-slot-number {
+  font-size: 9px;
+  color: #aaa;
+  align-self: flex-start;
+}
+
+.team-slot-placeholder {
+  font-size: 10px;
+  color: #ccc;
+}
+
+.team-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  gap: 4px;
+}
+
+.team-sprite {
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+  transition: transform 0.2s;
+}
+
+.team-link:hover .team-sprite {
+  transform: scale(1.08);
+}
+
+.team-member-name {
+  font-size: 10px;
+  text-transform: capitalize;
+  color: #333;
+}
+
+@media (max-width: 600px) {
+  .team-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
