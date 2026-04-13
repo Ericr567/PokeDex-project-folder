@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import PokemonCard from "./PokemonCard";
 import { extractPokemonId, preloadPokemonDetails } from "./pokemonDetails";
@@ -27,6 +27,7 @@ const GENERATION_RANGES = [
 
 const Pokedex = ({ favorites, toggleFavorite, notify }) => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTypeDetailsRef = useRef(new Set());
 
   const getInitialSortMode = () => {
     const value = searchParams.get("sort");
@@ -51,14 +52,43 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
 
   const { pokemons, loading, error, retry } = usePokemonList({ notify, pageName: "pokedex" });
 
-  // Eagerly preload all Pokémon details whenever the type filter is active so
-  // filtering by type has complete coverage even before the user browses pages.
+  // Preload type-filter candidates in small batches to keep mobile responsive.
   useEffect(() => {
-    if (!typeFilter || pokemons.length === 0) return;
-    preloadPokemonDetails(pokemons.map((p) => p.name)).then((details) => {
-      setDetailsByName((current) => ({ ...current, ...details }));
-    });
-  }, [typeFilter, pokemons]);
+    if (!typeFilter) return;
+
+    const candidates = baseFilteredPokemons
+      .map((pokemon) => pokemon.name)
+      .filter((name) => !detailsByName[name] && !requestedTypeDetailsRef.current.has(name));
+
+    if (candidates.length === 0) return;
+
+    const isMobile = window.matchMedia?.("(max-width: 768px)")?.matches ?? false;
+    const batchSize = isMobile ? 8 : 16;
+    const maxToQueue = isMobile ? 64 : 220;
+    const queue = candidates.slice(0, maxToQueue);
+
+    queue.forEach((name) => requestedTypeDetailsRef.current.add(name));
+
+    let isCancelled = false;
+
+    const preloadInBatches = async () => {
+      for (let index = 0; index < queue.length; index += batchSize) {
+        if (isCancelled) return;
+        const batch = queue.slice(index, index + batchSize);
+        const details = await preloadPokemonDetails(batch);
+        if (isCancelled) return;
+        setDetailsByName((current) => ({ ...current, ...details }));
+        // Yield between batches so touch/scroll stays responsive.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    };
+
+    preloadInBatches();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [typeFilter, baseFilteredPokemons, detailsByName]);
 
   // Keep component state in sync when user navigates browser history (back/forward).
   useEffect(() => {
@@ -109,22 +139,29 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
 
   const genRange = GENERATION_RANGES[genFilter] ?? GENERATION_RANGES[0];
 
-  const filteredPokemons = pokemons
-    .filter((pokemon) => pokemon.name.toLowerCase().includes(normalizedSearchTerm))
-    .filter((pokemon) => (favoritesOnly ? favorites.includes(pokemon.name) : true))
-    .filter((pokemon) => {
-      if (!genFilter) return true;
-      const id = extractPokemonId(pokemon);
-      return id >= genRange.min && id <= genRange.max;
-    })
-    .filter((pokemon) => {
+  const baseFilteredPokemons = useMemo(
+    () => pokemons
+      .filter((pokemon) => pokemon.name.toLowerCase().includes(normalizedSearchTerm))
+      .filter((pokemon) => (favoritesOnly ? favorites.includes(pokemon.name) : true))
+      .filter((pokemon) => {
+        if (!genFilter) return true;
+        const id = extractPokemonId(pokemon);
+        return id >= genRange.min && id <= genRange.max;
+      }),
+    [pokemons, normalizedSearchTerm, favoritesOnly, favorites, genFilter, genRange.min, genRange.max],
+  );
+
+  const filteredPokemons = useMemo(
+    () => baseFilteredPokemons.filter((pokemon) => {
       if (!typeFilter) return true;
       const details = detailsByName[pokemon.name];
       if (!details) return false;
       return details.types?.some((t) => t.type.name === typeFilter);
-    });
+    }),
+    [baseFilteredPokemons, typeFilter, detailsByName],
+  );
 
-  const sortedPokemons = [...filteredPokemons].sort((a, b) => {
+  const sortedPokemons = useMemo(() => [...filteredPokemons].sort((a, b) => {
     if (sortMode === "name-asc") {
       return a.name.localeCompare(b.name);
     }
@@ -135,13 +172,13 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
       return extractPokemonId(b) - extractPokemonId(a);
     }
     return extractPokemonId(a) - extractPokemonId(b);
-  });
+  }), [filteredPokemons, sortMode]);
 
   const indexOfLastPokemon = currentPage * pokemonsPerPage;
   const indexOfFirstPokemon = indexOfLastPokemon - pokemonsPerPage;
-  const currentPokemons = sortedPokemons.slice(
-    indexOfFirstPokemon,
-    indexOfLastPokemon,
+  const currentPokemons = useMemo(
+    () => sortedPokemons.slice(indexOfFirstPokemon, indexOfLastPokemon),
+    [sortedPokemons, indexOfFirstPokemon, indexOfLastPokemon],
   );
 
   useEffect(() => {
