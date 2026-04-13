@@ -957,6 +957,15 @@ kbd {
   margin-bottom: 12px;
 }
 
+.battle-team-summary {
+  width: min(100%, 760px);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 9px;
+}
+
 .battle-label {
   font-size: 9px;
   text-align: left;
@@ -1022,6 +1031,39 @@ kbd {
   justify-content: center;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+.battle-switch-grid {
+  width: min(100%, 760px);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+
+.battle-switch-btn {
+  border: 1px solid #d9cba8;
+  border-radius: 10px;
+  background: #fff8df;
+  color: #3a2f0b;
+  font-family: "Press Start 2P", sans-serif;
+  font-size: 8px;
+  padding: 8px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.battle-switch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.battle-switch-active {
+  border-color: #d13325;
+  background: #ffe7c8;
 }
 
 .battle-log {
@@ -1175,6 +1217,11 @@ kbd {
 
   .battle-label {
     text-align: left;
+  }
+
+  .battle-team-summary {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .battle-field {
@@ -1574,6 +1621,17 @@ body.dark-mode .battle-card,
 body.dark-mode .battle-log {
   background: #292929;
   border-color: #444;
+}
+
+body.dark-mode .battle-switch-btn {
+  background: #292929;
+  color: #efefef;
+  border-color: #444;
+}
+
+body.dark-mode .battle-switch-active {
+  background: #3a2c18;
+  border-color: #f0b856;
 }
 
 body.dark-mode .battle-label,
