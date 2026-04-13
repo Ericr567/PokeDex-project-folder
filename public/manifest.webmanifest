@@ -1,0 +1,9 @@
+{
+  "name": "Pokedex Retro",
+  "short_name": "Pokedex",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7e39c",
+  "theme_color": "#d13325",
+  "description": "A retro Pokedex with shiny mode, team builder, and tracker."
+}

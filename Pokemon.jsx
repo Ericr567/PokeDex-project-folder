@@ -11,7 +11,7 @@ import { TYPE_COLORS } from "./TypeEffectiveness";
 /**
  * Pokemon component for displaying detailed information of a specific Pokémon.
  */
-const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam, shinyDexMode = false }) => {
+const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam, shinyDexMode = false, shinyCollection = {}, updateShinyEntry }) => {
   const [pokemon, setPokemon] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -106,6 +106,7 @@ const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam, shinyDexMode = f
 
   const isInTeam = team?.some((m) => m.name === pokemon?.name);
   const teamFull = (team?.length ?? 0) >= 6;
+  const shinyEntry = shinyCollection?.[pokemon?.name] || {};
   const spriteUrl = showShiny
     ? (pokemon?.sprites?.front_shiny || pokemon?.sprites?.front_default)
     : pokemon?.sprites?.front_default;
@@ -140,6 +141,20 @@ const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam, shinyDexMode = f
               title={!isInTeam && teamFull ? "Team is full (max 6)" : ""}
             >
               {isInTeam ? "✓ In Team" : teamFull ? "Team Full" : "+ Add to Team"}
+            </button>
+            <button
+              className={`favorite-chip detail-favorite ${shinyEntry.seen ? "favorite-active" : ""}`}
+              type="button"
+              onClick={() => updateShinyEntry?.(pokemon.name, { id: pokemon.id, seen: !shinyEntry.seen })}
+            >
+              {shinyEntry.seen ? "✨ Seen" : "Mark Shiny Seen"}
+            </button>
+            <button
+              className={`favorite-chip detail-favorite ${shinyEntry.caught ? "favorite-active" : ""}`}
+              type="button"
+              onClick={() => updateShinyEntry?.(pokemon.name, { id: pokemon.id, seen: true, caught: !shinyEntry.caught })}
+            >
+              {shinyEntry.caught ? "🏆 Caught" : "Mark Shiny Caught"}
             </button>
           </div>
 

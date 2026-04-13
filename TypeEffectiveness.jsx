@@ -1,6 +1,6 @@
 import React from "react";
 
-const TYPE_CHART = {
+export const TYPE_CHART = {
   normal:   { weak: ["fighting"],                                   immune: ["ghost"],              resist: [] },
   fire:     { weak: ["water", "ground", "rock"],                    immune: [],                     resist: ["fire", "grass", "ice", "bug", "steel", "fairy"] },
   water:    { weak: ["electric", "grass"],                          immune: [],                     resist: ["fire", "water", "ice", "steel"] },
@@ -29,19 +29,26 @@ export const TYPE_COLORS = {
   steel: "#b7b7ce", fairy: "#d685ad",
 };
 
-const ALL_TYPES = Object.keys(TYPE_CHART);
+export const ALL_TYPES = Object.keys(TYPE_CHART);
+
+export const getTypeMultiplier = (attackingType, defendingTypes) => {
+  let multiplier = 1;
+
+  for (const defendingType of defendingTypes) {
+    const chart = TYPE_CHART[defendingType];
+    if (!chart) continue;
+    if (chart.immune.includes(attackingType)) return 0;
+    if (chart.weak.includes(attackingType)) multiplier *= 2;
+    if (chart.resist.includes(attackingType)) multiplier *= 0.5;
+  }
+
+  return multiplier;
+};
 
 const computeEffectiveness = (defTypes) => {
   const out = { immune: [], quarter: [], half: [], double: [], quadruple: [] };
   for (const atk of ALL_TYPES) {
-    let m = 1;
-    for (const def of defTypes) {
-      const c = TYPE_CHART[def];
-      if (!c) continue;
-      if (c.immune.includes(atk)) { m = 0; break; }
-      if (c.weak.includes(atk)) m *= 2;
-      if (c.resist.includes(atk)) m *= 0.5;
-    }
+    const m = getTypeMultiplier(atk, defTypes);
     if (m === 0) out.immune.push(atk);
     else if (m === 0.25) out.quarter.push(atk);
     else if (m === 0.5) out.half.push(atk);

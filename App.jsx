@@ -6,6 +6,7 @@ import Pokedex from "./PokeDex";
 import Search from "./Search";
 import Pokemon from "./Pokemon";
 import TeamBuilder from "./TeamBuilder";
+import ShinyTracker from "./ShinyTracker";
 import { fetchPokemonListWithCache } from "./pokemonDetails";
 import { trackUxEvent } from "./analytics";
 
@@ -51,6 +52,15 @@ export default function App() {
       return false;
     }
   });
+  const [shinyCollection, setShinyCollection] = useState(() => {
+    try {
+      const stored = localStorage.getItem("pokedex-shiny-collection");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [installPromptEvent, setInstallPromptEvent] = useState(null);
   const [toast, setToast] = useState(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
@@ -96,6 +106,30 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("pokedex-shiny-mode", String(isShinyDexMode));
   }, [isShinyDexMode]);
+
+  useEffect(() => {
+    localStorage.setItem("pokedex-shiny-collection", JSON.stringify(shinyCollection));
+  }, [shinyCollection]);
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPromptEvent(event);
+    };
+
+    const onInstalled = () => {
+      setInstallPromptEvent(null);
+      showToast("Pokedex installed", "success");
+    };
+
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isBooting) return;
@@ -145,6 +179,34 @@ export default function App() {
       trackUxEvent("team_added", { name: pokemon.name });
       return [...current, { name: pokemon.name, id: pokemon.id }];
     });
+  };
+
+  const updateShinyEntry = (name, update) => {
+    if (!name || !update) return;
+    setShinyCollection((current) => {
+      const previous = current[name] || {};
+      const next = {
+        ...previous,
+        ...update,
+      };
+      return { ...current, [name]: next };
+    });
+  };
+
+  const clearShinyCollection = () => {
+    setShinyCollection({});
+    showToast("Shiny tracker cleared", "info");
+  };
+
+  const handleInstallApp = async () => {
+    if (!installPromptEvent) return;
+    installPromptEvent.prompt();
+    try {
+      await installPromptEvent.userChoice;
+    } catch {
+      // Ignore install prompt errors and keep app usable.
+    }
+    setInstallPromptEvent(null);
   };
 
   const handleRandomPokemon = async (navigate) => {
@@ -213,6 +275,11 @@ export default function App() {
       if (event.key.toLowerCase() === "t") {
         navigateTo("/team");
         trackUxEvent("shortcut_used", { key: "t" });
+      }
+
+      if (event.key.toLowerCase() === "y") {
+        navigateTo("/shinydex");
+        trackUxEvent("shortcut_used", { key: "y" });
       }
     };
 
@@ -309,6 +376,12 @@ export default function App() {
                 >
                   Team {team.length > 0 ? `(${team.length}/6)` : ""}
                 </NavLink>
+                <NavLink
+                  to="/shinydex"
+                  className={({ isActive }) => (isActive ? "active-nav" : "")}
+                >
+                  Shiny
+                </NavLink>
               </nav>
 
               <div className="content">
@@ -336,11 +409,15 @@ export default function App() {
                   />
                   <Route
                     path="/pokemon"
-                    element={<Pokemon favorites={favorites} toggleFavorite={toggleFavorite} team={team} toggleTeam={toggleTeam} notify={showToast} shinyDexMode={isShinyDexMode} />}
+                    element={<Pokemon favorites={favorites} toggleFavorite={toggleFavorite} team={team} toggleTeam={toggleTeam} notify={showToast} shinyDexMode={isShinyDexMode} shinyCollection={shinyCollection} updateShinyEntry={updateShinyEntry} />}
                   />
                   <Route
                     path="/team"
                     element={<TeamBuilder team={team} onRemove={(name) => setTeam((t) => t.filter((m) => m.name !== name))} />}
+                  />
+                  <Route
+                    path="/shinydex"
+                    element={<ShinyTracker shinyCollection={shinyCollection} updateShinyEntry={updateShinyEntry} clearShinyCollection={clearShinyCollection} notify={showToast} />}
                   />
                 </Routes>
               </div>
@@ -378,6 +455,16 @@ export default function App() {
                 {isShinyDexMode ? "Shiny: ON" : "Shiny: OFF"}
               </button>
 
+              {installPromptEvent && (
+                <button
+                  className="theme-toggle install-app-toggle"
+                  onClick={handleInstallApp}
+                  type="button"
+                >
+                  Install App
+                </button>
+              )}
+
               <div className="dpad">
                 <span className="dpad-center" />
               </div>
@@ -412,6 +499,7 @@ export default function App() {
             <p><kbd>p</kbd> Go Pokédex</p>
             <p><kbd>s</kbd> Go Search</p>
             <p><kbd>t</kbd> Go Team</p>
+            <p><kbd>y</kbd> Go Shiny Tracker</p>
             <p><kbd>?</kbd> Open this help</p>
             <p><kbd>Esc</kbd> Close help</p>
             <button className="app-button" type="button" onClick={() => setIsHelpOpen(false)}>Close</button>

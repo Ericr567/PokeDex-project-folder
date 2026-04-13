@@ -360,6 +360,16 @@ nav a:focus-visible,
   box-shadow: 0 0 10px rgba(255, 222, 110, 0.55);
 }
 
+.install-app-toggle {
+  border-color: #b2f3ff;
+  color: #b2f3ff;
+  background: #11495f;
+}
+
+.install-app-toggle:hover {
+  background: #175f7c;
+}
+
 .dpad {
   width: 110px;
   height: 110px;
@@ -1413,6 +1423,12 @@ body.dark-mode .shiny-mode-active {
   color: #231800;
 }
 
+body.dark-mode .install-app-toggle {
+  background: #1a4e64;
+  border-color: #9be5f7;
+  color: #9be5f7;
+}
+
 body.dark-mode .active-nav {
   background-color: #f0b856;
   color: #1d1d1d;
@@ -1435,6 +1451,11 @@ body.dark-mode .status-bar {
   background: #2a2a2a;
   border-color: #444;
   color: #efefef;
+}
+
+body.dark-mode .shiny-gen-card {
+  background: #292929;
+  border-color: #444;
 }
 
 body.dark-mode kbd {
@@ -1688,6 +1709,32 @@ body.dark-mode .stat-track {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.shiny-gen-grid {
+  width: min(100%, 760px);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.shiny-gen-card {
+  border: 1px solid #f0dfaa;
+  border-radius: 10px;
+  background: #fff8df;
+  padding: 10px;
+}
+
+.shiny-gen-card h3 {
+  margin: 0 0 8px;
+  font-size: 10px;
+  color: #7b1f1f;
+}
+
+.shiny-gen-card p {
+  margin: 0 0 6px;
+  font-size: 9px;
 }
 
 /* --- Evolution chain --- */

@@ -8,3 +8,11 @@ import "./index.css";
 const container = document.getElementById("root");
 const root = createRoot(container);
 root.render(React.createElement(App));
+
+if ("serviceWorker" in navigator) {
+	window.addEventListener("load", () => {
+		navigator.serviceWorker.register("/sw.js").catch(() => {
+			// Keep app functional even if service worker registration fails.
+		});
+	});
+}
