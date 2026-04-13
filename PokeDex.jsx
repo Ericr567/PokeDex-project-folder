@@ -52,44 +52,6 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
 
   const { pokemons, loading, error, retry } = usePokemonList({ notify, pageName: "pokedex" });
 
-  // Preload type-filter candidates in small batches to keep mobile responsive.
-  useEffect(() => {
-    if (!typeFilter) return;
-
-    const candidates = baseFilteredPokemons
-      .map((pokemon) => pokemon.name)
-      .filter((name) => !detailsByName[name] && !requestedTypeDetailsRef.current.has(name));
-
-    if (candidates.length === 0) return;
-
-    const isMobile = window.matchMedia?.("(max-width: 768px)")?.matches ?? false;
-    const batchSize = isMobile ? 8 : 16;
-    const maxToQueue = isMobile ? 64 : 220;
-    const queue = candidates.slice(0, maxToQueue);
-
-    queue.forEach((name) => requestedTypeDetailsRef.current.add(name));
-
-    let isCancelled = false;
-
-    const preloadInBatches = async () => {
-      for (let index = 0; index < queue.length; index += batchSize) {
-        if (isCancelled) return;
-        const batch = queue.slice(index, index + batchSize);
-        const details = await preloadPokemonDetails(batch);
-        if (isCancelled) return;
-        setDetailsByName((current) => ({ ...current, ...details }));
-        // Yield between batches so touch/scroll stays responsive.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-    };
-
-    preloadInBatches();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [typeFilter, baseFilteredPokemons, detailsByName]);
-
   // Keep component state in sync when user navigates browser history (back/forward).
   useEffect(() => {
     const nextSearchTerm = searchParams.get("q") || "";
@@ -150,6 +112,44 @@ const Pokedex = ({ favorites, toggleFavorite, notify }) => {
       }),
     [pokemons, normalizedSearchTerm, favoritesOnly, favorites, genFilter, genRange.min, genRange.max],
   );
+
+  // Preload type-filter candidates in small batches to keep mobile responsive.
+  useEffect(() => {
+    if (!typeFilter) return;
+
+    const candidates = baseFilteredPokemons
+      .map((pokemon) => pokemon.name)
+      .filter((name) => !detailsByName[name] && !requestedTypeDetailsRef.current.has(name));
+
+    if (candidates.length === 0) return;
+
+    const isMobile = window.matchMedia?.("(max-width: 768px)")?.matches ?? false;
+    const batchSize = isMobile ? 8 : 16;
+    const maxToQueue = isMobile ? 64 : 220;
+    const queue = candidates.slice(0, maxToQueue);
+
+    queue.forEach((name) => requestedTypeDetailsRef.current.add(name));
+
+    let isCancelled = false;
+
+    const preloadInBatches = async () => {
+      for (let index = 0; index < queue.length; index += batchSize) {
+        if (isCancelled) return;
+        const batch = queue.slice(index, index + batchSize);
+        const details = await preloadPokemonDetails(batch);
+        if (isCancelled) return;
+        setDetailsByName((current) => ({ ...current, ...details }));
+        // Yield between batches so touch/scroll stays responsive.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    };
+
+    preloadInBatches();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [typeFilter, baseFilteredPokemons, detailsByName]);
 
   const filteredPokemons = useMemo(
     () => baseFilteredPokemons.filter((pokemon) => {
