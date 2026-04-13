@@ -111,8 +111,14 @@ const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam }) => {
       {loading && <Spinner />}
       {error && <p className="status-error">Error: {error}</p>}
       {pokemon && (
-        <div className="detail-card">
-          <h1 className="section-title">{pokemon.name}</h1>
+        <div
+          className="detail-card"
+          style={{
+            background: `linear-gradient(160deg, ${statAccent}22 0%, transparent 28%), #fff8df`,
+            borderTop: `4px solid ${statAccent}`,
+          }}
+        >
+          <h1 className="section-title" style={{ color: statAccent }}>{pokemon.name}</h1>
 
           <div className="detail-actions">
             <button
@@ -134,7 +140,12 @@ const Pokemon = ({ favorites, toggleFavorite, team, toggleTeam }) => {
           </div>
 
           <div className="sprite-controls">
-            <img src={spriteUrl} alt={pokemon.name} className="detail-sprite" />
+            <div
+              className="detail-sprite-bubble"
+              style={{ background: `radial-gradient(circle, ${statAccent}30 0%, transparent 70%)` }}
+            >
+              <img src={spriteUrl} alt={pokemon.name} className="detail-sprite" />
+            </div>
             {pokemon.sprites?.front_shiny && (
               <button
                 className={`shiny-toggle ${showShiny ? "shiny-active" : ""}`}

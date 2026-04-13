@@ -262,6 +262,7 @@ export default function App() {
             <div className="lens lens-sm lens-red led-pulse" />
             <div className="lens lens-sm lens-yellow led-pulse led-delay" />
             <div className="lens lens-sm lens-green led-pulse led-delay-2" />
+            <span className="device-title">POKéDEX</span>
           </header>
 
           <div className="device-hinge" />

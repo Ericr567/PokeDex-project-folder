@@ -52,6 +52,16 @@ body {
   border-bottom: 3px solid #8c1712;
 }
 
+.device-title {
+  margin-left: auto;
+  font-family: "Press Start 2P", sans-serif;
+  font-size: 13px;
+  color: #fde8d4;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.35), 0 0 12px rgba(255,200,180,0.4);
+  user-select: none;
+}
+
 .lens {
   border-radius: 50%;
   border: 2px solid rgba(0, 0, 0, 0.2);
@@ -213,16 +223,32 @@ body {
   background-color: #d8ebe2;
   background-image: repeating-linear-gradient(
     0deg,
-    rgba(0, 0, 0, 0.04) 0,
-    rgba(0, 0, 0, 0.04) 1px,
+    rgba(0, 0, 0, 0.035) 0,
+    rgba(0, 0, 0, 0.035) 1px,
     transparent 1px,
-    transparent 3px
+    transparent 4px
   );
-  border-radius: 14px; /* Rounded corners */
+  border-radius: 14px;
   border: 4px solid #2a3b36;
   box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.25), 0 8px 24px rgba(0, 0, 0, 0.12);
   position: relative;
   overflow: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #d13325 #c2d9ce;
+}
+
+.content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.content::-webkit-scrollbar-track {
+  background: #c2d9ce;
+  border-radius: 999px;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background: #d13325;
+  border-radius: 999px;
 }
 
 .content::after {
@@ -243,9 +269,12 @@ body {
   z-index: 1;
 }
 
-p {
-  line-height: 1.6; /* Improved readability */
-  margin-bottom: 16px; /* Space between paragraphs */
+.detail-card p,
+.fact-box p,
+.featured-card p,
+.page-shell > p {
+  line-height: 1.6;
+  margin-bottom: 10px;
 }
 
 /* Navigation bar styles */
@@ -270,9 +299,11 @@ nav a {
   font-weight: bold;
   color: #F7E39C;
   margin: 0;
-  padding: 10px 14px;
+  padding: 10px 16px;
   border-radius: 8px;
-  transition: color 0.3s, transform 0.3s, background-color 0.3s;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  transition: color 0.2s, transform 0.2s, background-color 0.2s, box-shadow 0.2s;
 }
 
 nav a:focus-visible,
@@ -383,6 +414,7 @@ a {
 .active-nav {
   background-color: #f7e39c;
   color: var(--accent-strong);
+  box-shadow: 0 2px 0 #d4a800;
 }
 
 .page-shell {
@@ -420,6 +452,28 @@ kbd {
 
 .section-title {
   color: #d13325;
+  font-size: 15px;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  position: relative;
+  display: inline-block;
+  padding-bottom: 10px;
+}
+
+.section-title::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.4;
+}
+
+.page-shell > .section-title {
   margin-bottom: 16px;
 }
 
@@ -824,11 +878,31 @@ kbd {
   animation: factFade 0.55s ease;
 }
 
-.featured-card img,
-.detail-sprite {
+.featured-card img {
   width: 180px;
   height: 180px;
   image-rendering: pixelated;
+}
+
+.detail-sprite {
+  width: 220px;
+  height: 220px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.15));
+}
+
+.detail-sprite-bubble {
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s ease;
+}
+
+.detail-sprite-bubble:hover {
+  transform: scale(1.04);
 }
 
 .page-indicator {
@@ -855,11 +929,18 @@ kbd {
   font-family: "Press Start 2P", sans-serif;
   padding: 10px 12px;
   cursor: pointer;
-  transition: transform 0.2s, opacity 0.2s;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s;
+  box-shadow: 0 3px 0 #8c1712;
 }
 
 .app-button:hover:not(:disabled) {
   transform: translateY(-2px);
+  box-shadow: 0 5px 0 #8c1712, 0 6px 16px rgba(0,0,0,0.18);
+}
+
+.app-button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #8c1712;
 }
 
 .app-button:disabled {
@@ -944,13 +1025,9 @@ kbd {
     max-width: 260px;
   }
 }
-.pokemon-card:hover {
-  transform: translateY(-3px);
-  transition: transform 0.2s;
-  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.16);
-}
+/* PokemonCard overrides (specificity bump from App.css) */
 .pokemon-card h2 {
-  color: #D13325; /* give title a more vibrant color */
+  color: #222;
 }
 
 @keyframes ledBlink {
@@ -1482,6 +1559,33 @@ body.dark-mode .type-effectiveness,
 body.dark-mode .evolution-chain {
   background: #2a2a2a;
   border-color: #444;
+}
+
+body.dark-mode .pokemon-card {
+  background: #252525;
+  border-color: #3a3a3a;
+}
+
+body.dark-mode .pokemon-card h2 {
+  color: #eee;
+}
+
+body.dark-mode .pokemon-number,
+body.dark-mode .pokemon-meta {
+  color: #aaa;
+}
+
+body.dark-mode .device-title {
+  color: #fddac8;
+  text-shadow: 0 0 14px rgba(255, 180, 160, 0.5);
+}
+
+body.dark-mode .detail-sprite {
+  filter: drop-shadow(0 4px 14px rgba(255,255,255,0.08));
+}
+
+body.dark-mode .active-nav {
+  box-shadow: 0 2px 0 #b08800;
 }
 
 body.dark-mode .eff-label,
